@@ -1,4 +1,4 @@
-def genw_sparse(N, mean, std, p):
+def genw_sparse(N, m, std, p):
     # this function returns a NxN matrix 
     # each entry is non-zero with probability p
     # entries are gaussian with mean m and standard deviation std
