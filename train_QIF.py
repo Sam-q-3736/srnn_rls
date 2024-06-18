@@ -53,7 +53,7 @@ def train_QIF(neuron_params, time_params, W, stim, targets):
         
         # spike detection
         idx1 = theta_next - theta > 0
-        idx2 = theta_next - theta > np.mod(np.pi - np.mod(theta, 2*np.pi), 2*np.pi) # surely there's a better way to do this...
+        idx2 = theta_next - theta > np.mod(np.pi - theta, 2*np.pi) # surely there's a better way to do this...
         idx = np.multiply(idx1, idx2)
         r[idx] += 1/tau_s # update spikes in r
         
