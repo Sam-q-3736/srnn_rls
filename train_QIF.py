@@ -4,6 +4,12 @@ def train_QIF(neuron_params, time_params, W, stim, targets):
     tau, tau_s, lam = neuron_params
     T, stim_on, stim_off, dt = time_params
 
+    # tau: neuron decay constant
+    # tau_s: synaptic decay constant
+    # lam: learning rate
+    # T: total training time
+    # dt: time step
+
     # initialize variables
     theta = np.zeros(N) # phase of neurons
     u = np.zeros(N) # synaptic drive
