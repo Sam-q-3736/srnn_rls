@@ -22,7 +22,6 @@ def train_QIF(neuron_params, time_params, W, stim, targets):
         Pidx[row] = (W[row] != 0)
         tot = int(np.sum(Pidx[row]))
         Ps.append(1/lam * np.identity(tot))
-        
     Pidx = Pidx.astype(bool)
 
     # ODE of theta neuron model
