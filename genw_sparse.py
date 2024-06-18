@@ -1,11 +1,5 @@
+# returns a sparse NxN matrix with gaussian entries
 def genw_sparse(N, m, std, p):
-    # this function returns a NxN matrix 
-    # each entry is non-zero with probability p
-    # entries are gaussian with mean m and standard deviation std
-    w = np.zeros((N, N)) # initialize NxN matrix of zeros
-    for i in range(N):
-        for j in range(N):
-            weight = sp.stats.norm.rvs(m, std)
-            is_zero = sp.stats.bernoulli.rvs(p)
-            w[i][j] = weight*is_zero
-    return w
+    weight = sp.stats.norm.rvs(m, std, (N, N))
+    is_zero = np.random.choice([0, 1], (N, N), [1-p, p])    
+    return np.multiply(weight, is_zero)
