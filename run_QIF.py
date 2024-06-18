@@ -34,10 +34,10 @@ def run_QIF(neuron_params, time_params, W, stim, targets):
         # does not include addition of new spikes
 
     # variables to track behavior
-    filt_spks = np.zeros(int(T/dt), N)
-    spks = np.zeros(int(T/dt), N) # tracks spike times for raster plots
-    sdrive = np.zeros(int(T/dt), N) # tracks u, synaptic drive
-    thetas = np.zeros(int(T/dt), N) # tracks theta (phase) of neurons
+    filt_spks = np.zeros((int(T/dt), N))
+    spks = np.zeros((int(T/dt), N)) # tracks spike times for raster plots
+    sdrive = np.zeros((int(T/dt), N)) # tracks u, synaptic drive
+    thetas = np.zeros((int(T/dt), N)) # tracks theta (phase) of neurons
 
     # running loop to simulate behavior
     t = 0.0
@@ -59,13 +59,13 @@ def run_QIF(neuron_params, time_params, W, stim, targets):
         
         # spike detection
         idx1 = theta_next - theta > 0
-        idx2 = theta_next - theta > np.mod(np.pi - np.mod(theta, 2*np.pi), 2*np.pi) # surely there's a better way to do this...
+        idx2 = theta_next - theta > np.mod(np.pi - theta, 2*np.pi) # surely there's a better way to do this...
         idx = np.multiply(idx1, idx2)
         r[idx] += 1/tau_s # update spikes in r
         
         # track behavior
         filt_spks[int(t/dt)] = r
-        spks[int(t/dt)] = r
+        spks[int(t/dt)][idx] += 1
         sdrive[int(t/dt)] = u
         thetas[int(t/dt)] = theta
 
@@ -74,3 +74,8 @@ def run_QIF(neuron_params, time_params, W, stim, targets):
         r = r + (r1 + 2*r2 + 2*r3 + r4)/6
         u = np.dot(W, r)
         t = t + dt
+
+filt_spks = np.transpose(filt_spks)
+spks = np.transpose(spks)
+sdrive = np.transpose(sdrive)
+thetas = np.transpose(thetas)
