@@ -34,8 +34,7 @@ def run_QIF(neuron_params, time_params, W, stim, targets):
         # does not include addition of new spikes
 
     # variables to track behavior
-    filt_spks = np.zeros((int(T/dt), N))
-    spks = np.zeros((int(T/dt), N)) # tracks spike times for raster plots
+    filt_spks = [np.zeros((int(T/dt), N))]
     sdrive = np.zeros((int(T/dt), N)) # tracks u, synaptic drive
     thetas = np.zeros((int(T/dt), N)) # tracks theta (phase) of neurons
 
@@ -61,21 +60,19 @@ def run_QIF(neuron_params, time_params, W, stim, targets):
         idx1 = theta_next - theta > 0
         idx2 = theta_next - theta > np.mod(np.pi - theta, 2*np.pi) # surely there's a better way to do this...
         idx = np.multiply(idx1, idx2)
-        r[idx] += 1/tau_s # update spikes in r
+        r[idx] += 1/tau_s # update spikes
         
-        # track behavior
-        filt_spks[int(t/dt)] = r
-        spks[int(t/dt)][idx] += 1
-        sdrive[int(t/dt)] = u
-        thetas[int(t/dt)] = theta
-
         # update variables
         theta = np.mod(theta + (k1 + 2*k2 + 2*k3 + k4)/6, 2*np.pi)
         r = r + (r1 + 2*r2 + 2*r3 + r4)/6
         u = np.dot(W, r)
         t = t + dt
 
-filt_spks = np.transpose(filt_spks)
-spks = np.transpose(spks)
-sdrive = np.transpose(sdrive)
-thetas = np.transpose(thetas)
+        # track variables (optional)
+        filt_spks.append(r)
+        sdrive.append(u)  
+        thetas.append(theta)
+    
+    filt_spks = np.transpose(filt_spks)
+    sdrive = np.transpose(sdrive)
+    thetas = np.transpose(thetas)
