@@ -44,7 +44,6 @@ class QIF_training(spike_training):
     def dtheta(theta, n_drive):
         return 1/tau * (1 - np.cos(theta) + np.multiply(n_drive, (1 + np.cos(theta))))
 
-    # ODE of filtered spike train
     def dr(r): 
         return -1/tau_s * r 
         # does not include addition of new spikes
@@ -122,7 +121,7 @@ class QIF_training(spike_training):
                 # train W matrix
                 if t > stim_off and t < int(T) and np.mod(int(t/dt), int(train_every/dt)) == 0: # only train after initial stimulus
                     for row in range(N): # update each row of W by RLS
-                        
+
                         # update correlation matrix
                         numer = np.outer(np.dot(Ps[row], r[Pidx[row]]), np.dot(Ps[row], r[Pidx[row]]))
                         denom = 1 + np.dot(r[Pidx[row]], np.dot(Ps[row], r[Pidx[row]]))
