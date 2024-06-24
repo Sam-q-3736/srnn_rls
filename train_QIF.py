@@ -1,7 +1,10 @@
+import numpy as np
+import scipy as sp
+
 def train_QIF(neuron_params, time_params, train_params, W, stim, targets):
 
     # unpack parameters
-    tau, tau_s, lam = neuron_params
+    N, tau, tau_s, lam = neuron_params
     T, stim_on, stim_off, dt = time_params
     nloop, train_every = train_params
     
@@ -81,6 +84,7 @@ def train_QIF(neuron_params, time_params, train_params, W, stim, targets):
             sdrive.append(u)  
             thetas.append(theta)
             spk_rast.append(spk_t)
+            spk_t = np.zeros(N)
 
             # train W matrix
             if t > stim_off and t < int(T) and np.mod(int(t/dt), int(train_every/dt)) == 0: # only train after initial stimulus
