@@ -41,7 +41,6 @@ class QIF_training(spike_training):
         self.W_init = genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
         self.W_trained = np.copy(self.W_init)
 
-    # ODE of theta neuron model
     def dtheta(theta, n_drive):
         return 1/tau * (1 - np.cos(theta) + np.multiply(n_drive, (1 + np.cos(theta))))
 
@@ -50,6 +49,19 @@ class QIF_training(spike_training):
         return -1/tau_s * r 
         # does not include addition of new spikes
         
+    def rk4_step(theta, u, ext, r): 
+        k1 = dt * dtheta(theta, u + ext)
+        k2 = dt * dtheta(theta + k1/2, u + ext)
+        k3 = dt * dtheta(theta + k2/2, u + ext)
+        k4 = dt * dtheta(theta + k3, u + ext)
+        theta_next = theta + (k1 + 2*k2 + 2*k3 + k4)/6
+        r1 = dt * dr(r) 
+        r2 = dt * dr(r + r1/2)
+        r3 = dt * dr(r + r2/2)
+        r4 = dt * dr(r + r3)
+        r_next = r + (r1 + 2*r2 + 2*r3 + r4)/6
+        return theta_next, r_next
+
     def train_QIF(self, neuron_params, time_params, train_params, W, stim, targets):
             
         # unpack parameters
@@ -92,19 +104,7 @@ class QIF_training(spike_training):
             itr = 0
             while t < T:
 
-                # RK4 for theta neuron model (one step)
-                k1 = dt * dtheta(theta, u + stim[:, int(t/dt)]);
-                k2 = dt * dtheta(theta + k1/2, u + stim[:, int(t/dt)]);
-                k3 = dt * dtheta(theta + k2/2, u + stim[:, int(t/dt)]);
-                k4 = dt * dtheta(theta + k3, u + stim[:, int(t/dt)]);
-                theta_next = theta + (k1 + 2*k2 + 2*k3 + k4)/6;
-
-                # RK4 for filtered spike train (one step)
-                r1 = dt * dr(r) 
-                r2 = dt * dr(r + r1/2)
-                r3 = dt * dr(r + r2/2)
-                r4 = dt * dr(r + r3)
-                r_next = r + (r1 + 2*r2 + 2*r3 + r4)/6
+                theta_next, r_next = rk4_step(theta, u, ext, r)
 
                 # spike detection
                 idx1 = theta_next - theta > 0
@@ -114,8 +114,8 @@ class QIF_training(spike_training):
                 spk_t[idx] += 1
 
                 # update variables
-                theta = np.mod(theta + (k1 + 2*k2 + 2*k3 + k4)/6, 2*np.pi)
-                r = r + (r1 + 2*r2 + 2*r3 + r4)/6
+                theta = np.mod(theta_next, 2*np.pi)
+                r = r_next
                 u = np.dot(W, r)
                 t = t + dt
                 
@@ -165,15 +165,6 @@ class QIF_training(spike_training):
         u = np.zeros(N) # synaptic drive
         r = np.zeros(N) # filtered synaptic drive
         spk_t = np.zeros(N) # discrete spikes
-        
-        # ODE of theta neuron model
-        def dtheta(theta, n_drive):
-            return 1/tau * (1 - np.cos(theta) + np.multiply(n_drive, (1 + np.cos(theta))))
-
-        # ODE of filtered spike train
-        def dr(r): 
-            return -1/tau_s * r 
-            # does not include addition of new spikes
 
         # optional variables to track states
         spks = []
@@ -185,25 +176,13 @@ class QIF_training(spike_training):
         t = 0.0
         itr = 0
         while t < run_time:
-
-            # RK4 for theta neuron model (one step)
+            
             if t < stim_off:
                 ext = stim[:, int(t/dt)]
             if t > stim_off:
                 ext = np.zeros(N)
-            
-            k1 = dt * dtheta(theta, u + ext);
-            k2 = dt * dtheta(theta + k1/2, u + ext);
-            k3 = dt * dtheta(theta + k2/2, u + ext);
-            k4 = dt * dtheta(theta + k3, u + ext);
-            theta_next = theta + (k1 + 2*k2 + 2*k3 + k4)/6;
 
-            # RK4 for filtered spike train (one step)
-            r1 = dt * dr(r) 
-            r2 = dt * dr(r + r1/2)
-            r3 = dt * dr(r + r2/2)
-            r4 = dt * dr(r + r3)
-            r_next = r + (r1 + 2*r2 + 2*r3 + r4)/6
+            theta_next, r_next = rk4_step(theta, u, ext, r)
 
             # spike detection
             idx1 = theta_next - theta > 0
@@ -213,8 +192,8 @@ class QIF_training(spike_training):
             spk_t[idx] += 1
             
             # update variables
-            theta = np.mod(theta + (k1 + 2*k2 + 2*k3 + k4)/6, 2*np.pi)
-            r = r + (r1 + 2*r2 + 2*r3 + r4)/6
+            theta = np.mod(theta_next, 2*np.pi)
+            r = r_next
             u = np.dot(W, r)
             t = t + dt
             
