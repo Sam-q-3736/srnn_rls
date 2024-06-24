@@ -68,13 +68,6 @@ class QIF_training(spike_training):
         N, tau, tau_s, lam = neuron_params
         T, stim_on, stim_off, dt = time_params
         nloop, train_every = train_params
-        
-        # tau: neuron decay constant
-        # tau_s: synaptic decay constant
-        # lam: learning rate
-        # T: total training time
-        # dt: time step
-        # nloop: number of training trials
 
         # initialize variables
         theta = np.zeros(N) # phase of neurons
@@ -119,7 +112,7 @@ class QIF_training(spike_training):
                 u = np.dot(W, r)
                 t = t + dt
                 
-                # track variables (optional)
+                # track variables 
                 spks.append(r)
                 sdrive.append(u)  
                 thetas.append(theta)
@@ -129,7 +122,7 @@ class QIF_training(spike_training):
                 # train W matrix
                 if t > stim_off and t < int(T) and np.mod(int(t/dt), int(train_every/dt)) == 0: # only train after initial stimulus
                     for row in range(N): # update each row of W by RLS
-
+                        
                         # update correlation matrix
                         numer = np.outer(np.dot(Ps[row], r[Pidx[row]]), np.dot(Ps[row], r[Pidx[row]]))
                         denom = 1 + np.dot(r[Pidx[row]], np.dot(Ps[row], r[Pidx[row]]))
@@ -153,13 +146,6 @@ class QIF_training(spike_training):
         N, tau, tau_s, lam = neuron_params
         T, stim_on, stim_off, dt = time_params
         
-        # tau: neuron decay constant
-        # tau_s: synaptic decay constant
-        # lam: learning rate
-        # T: total training time
-        # dt: time step
-        # nloop: number of training trials
-
         # initialize variables
         theta = np.zeros(N) # phase of neurons
         u = np.zeros(N) # synaptic drive
@@ -197,7 +183,7 @@ class QIF_training(spike_training):
             u = np.dot(W, r)
             t = t + dt
             
-            # track variables (optional)
+            # track variables
             spks.append(r)
             sdrive.append(u)  
             thetas.append(theta)
