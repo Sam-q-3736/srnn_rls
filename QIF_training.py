@@ -7,7 +7,7 @@ class QIF_training(spike_training):
     
     def create_default_params():
         neuron_params = {
-            'network_size': 200, # units in network
+            'net_size': 200, # units in network
             'tau': 1, # ms, neuron decay constant
             'tau_s': 20, # ms, synaptic filtering constant
             'lam': 1 # learning rate factor
@@ -22,8 +22,24 @@ class QIF_training(spike_training):
             'training_loops': 10, # number of training loops
             'train_every': 2 # ms, timestep of updating connectivity matrix
         }
-        return neuron_params, time_params, train_params
+        connectivity_params = {
+            'm': 0, # mean
+            'std': 1/np.sqrt(N), # standard deviation
+            'cp': 0.3, # connection probability
+        }
+        run_params = {
+            'runtime': 2000 # ms, runtime of trained network
+        }
+        return neuron_params, time_params, train_params, connectivity_params, run_params
 
+    def __init__(self, neuron_params, time_params, train_params, connectivity_params, run_params):
+        self.neuron_params = neuron_params
+        self.time_params = time_params
+        self.train_params = train_params
+        self.connectivity_params = connectivity_params
+        self.run_params = run_params
+        self.W_init = genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
+        self.W_trained = np.copy(self.W_init)
 
     # ODE of theta neuron model
     def dtheta(theta, n_drive):
