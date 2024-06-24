@@ -5,6 +5,9 @@ import seaborn as sns
 
 class spike_training:
 
+    def create_default_params():
+        raise NotImplementedError
+
     def __init__(self):
         raise NotImplementedError
 
