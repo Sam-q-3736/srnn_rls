@@ -4,9 +4,8 @@ import scipy as sp
 def run_QIF(neuron_params, time_params, W, stim, run_time):
 
     # unpack parameters
-    tau, tau_s, lam = neuron_params
+    N, tau, tau_s, lam = neuron_params
     T, stim_on, stim_off, dt = time_params
-    nloop, train_every = train_params
     
     # tau: neuron decay constant
     # tau_s: synaptic decay constant

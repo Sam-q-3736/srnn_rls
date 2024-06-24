@@ -4,7 +4,7 @@ import scipy as sp
 def train_QIF(neuron_params, time_params, train_params, W, stim, targets):
 
     # unpack parameters
-    tau, tau_s, lam = neuron_params
+    N, tau, tau_s, lam = neuron_params
     T, stim_on, stim_off, dt = time_params
     nloop, train_every = train_params
     
