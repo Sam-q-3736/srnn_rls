@@ -1,3 +1,6 @@
+import numpy as np
+import scipy as sp
+
 def train_QIF(neuron_params, time_params, train_params, W, stim, targets):
 
     # unpack parameters
