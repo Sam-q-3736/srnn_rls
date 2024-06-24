@@ -13,7 +13,7 @@ def run_rate(rate_params, J, fin, fout):
 
     # differential equation of dx/dt
     def dx(x):
-        return 1/tau_x * (-x + gain * np.dot(J, np.tanh(x)) + fin + fout)
+        return 1/tau_x * (-x + gain * np.dot(J, np.tanh(x)) + fin[:, int(t/dt)] + fout[:, int(t/dt)])
     
     t = 0
     while t < T: 
