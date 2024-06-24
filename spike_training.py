@@ -19,11 +19,9 @@ class spike_training:
     def run_network(self, neuron_params, time_params, W, stim, run_time):
         raise NotImplementedError
 
-    def plot_spk_rasts(self, spk_rast):
+    def plot_spk_rasts(self, spk_rast, inds):
         spk_inds, spk_t = np.nonzero(spk_rast)
         spk_times = []
         for idx in np.unique(spk_inds):
             spk_times.append(spk_t[spk_inds == idx])
-        plt.eventplot(spk_times[0:10]);
-
-    
+        plt.eventplot(spk_times[inds]);
