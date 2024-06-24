@@ -5,6 +5,26 @@ import seaborn as sns
 
 class QIF_training(spike_training):
     
+    def create_default_params():
+        neuron_params = {
+            'network_size': 200, # units in network
+            'tau': 1, # ms, neuron decay constant
+            'tau_s': 20, # ms, synaptic filtering constant
+            'lam': 1 # learning rate factor
+        }
+        time_params = {
+            'total_time': 1000, # ms, total runtime 
+            'stim_on': 0, # ms, start of stimulus on
+            'stim_off': 50, # ms, stim off time
+            'dt': 0.1 # ms, timestep for differential equations
+        }
+        train_params = {
+            'training_loops': 10, # number of training loops
+            'train_every': 2 # ms, timestep of updating connectivity matrix
+        }
+        return neuron_params, time_params, train_params
+
+
     # ODE of theta neuron model
     def dtheta(theta, n_drive):
         return 1/tau * (1 - np.cos(theta) + np.multiply(n_drive, (1 + np.cos(theta))))
