@@ -118,6 +118,8 @@ class rate_training(spike_training):
                 P = P - numer / denom
 
                 # update error
+                e = targets[itr]
+
         
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
