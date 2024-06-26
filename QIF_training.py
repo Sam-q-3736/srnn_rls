@@ -68,9 +68,9 @@ class QIF_training(spike_training):
         return -1/self.tau_s * r_in
         # does not include addition of new spikes
         
-    def rk4_step(self, stim, t): 
+    def rk4_step(self, stim, itr): 
         if t < self.stim_off:
-            ext = stim[:, int(t/self.dt)]
+            ext = stim[:, itr]
         else:
             ext = np.zeros(self.N)
         
@@ -127,14 +127,17 @@ class QIF_training(spike_training):
         # training loop
         for i in range(self.nloop):
             print('training trial', i)
-            t = 0.0
-            while t < self.T:
+            t = 0
+            itr = 0
+            timesteps = int(self.T/self.dt)
+            while itr < timesteps:
 
                 # calculate next timestep of variables and update
-                self.rk4_step(stim, t) 
+                self.rk4_step(stim, itr) 
 
                 # update timestep
                 t = t + self.dt
+                itr = itr + 1 
 
                 # track variables 
                 spks.append(self.r)
@@ -187,13 +190,16 @@ class QIF_training(spike_training):
         
         # training loop
         t = 0.0
-        while t < self.run_time:
+        itr = 0
+        timesteps = int(self.T/self.dt)
+        while itr < timesteps:
 
             # calculate next timestep of variables and update
-            self.rk4_step(stim, t) 
+            self.rk4_step(stim, itr) 
 
             # update timestep
             t = t + self.dt
+            itr = itr + 1
 
             # track variables 
             spks.append(self.r)
