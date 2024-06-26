@@ -146,7 +146,7 @@ class QIF_training(spike_training):
                 self.spk_t = np.zeros(self.N)
 
                 # train W matrix
-                if t > self.stim_off and t < int(self.T) \
+                if itr > int(self.stim_off/self.dt) and itr < timesteps \
                     and np.mod(itr, int(self.train_every/self.dt)) == 0: # only train after initial stimulus
                     
                     for row in range(self.N): # update each row of W by RLS
