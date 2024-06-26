@@ -55,14 +55,14 @@ class rate_training(spike_training):
         self.x = np.zeros(self.N)
 
     # differential equation of dx/dt
-    def dx(self, x, t, ext):
-        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext[:, int(t/self.dt)])
+    def dx(self, x, itr, ext):
+        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext[:, itr])
     
-    def rk4_step(self, ext, t):
-        x1 = self.dt * self.dx(self.x, t, ext)
-        x2 = self.dt * self.dx(self.x + x1/2, t, ext)
-        x3 = self.dt * self.dx(self.x + x2/2, t, ext)
-        x4 = self.dt * self.dx(self.x + x3, t, ext)
+    def rk4_step(self, ext, itr):
+        x1 = self.dt * self.dx(self.x, itr, ext)
+        x2 = self.dt * self.dx(self.x + x1/2, itr, ext)
+        x3 = self.dt * self.dx(self.x + x2/2, itr, ext)
+        x4 = self.dt * self.dx(self.x + x3, itr, ext)
         x_next = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
 
         self.x = x_next
@@ -77,12 +77,15 @@ class rate_training(spike_training):
         x_vals = []
 
         t = 0
-        while t < self.T: 
+        itr = 0
+        timesteps = int(self.T/self.dt)
+        while itr < timesteps:
             print(t)
             # RK4 for each timestep
             self.rk4_step(ufin + ufout, t)
 
             t = t + self.dt
+            itr = itr + 1
             x_vals.append(self.x)
         
         return np.transpose(x_vals)
