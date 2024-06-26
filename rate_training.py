@@ -115,7 +115,7 @@ class rate_training(spike_training):
                 P = P - numer / denom
 
                 # update error
-                err = targets[row][itr] - np.dot(self.W_trained, self.Hx) # error is scalar
+                err = targets[:, itr] - np.dot(self.W_trained, self.Hx) # error is scalar
 
                 # update connectivity
                 self.W_trained = self.W_trained + err * np.dot(P, self.Hx)

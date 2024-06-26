@@ -157,12 +157,12 @@ class QIF_training(spike_training):
                         Ps[row] = Ps[row] - numer / denom
 
                         # update error term
-                        err = targets[row][itr] - \
-                            np.dot(self.W_trained[row][Pidx[row]], self.r[Pidx[row]]) # error is scalar
+                        err = targets[row, itr] - \
+                            np.dot(self.W_trained[row, Pidx[row]], self.r[Pidx[row]]) # error is scalar
 
                         # update W
-                        self.W_trained[row][Pidx[row]] \
-                            = self.W_trained[row][Pidx[row]] + err * np.dot(Ps[row], self.r[Pidx[row]])
+                        self.W_trained[row, Pidx[row]] \
+                            = self.W_trained[row, Pidx[row]] + err * np.dot(Ps[row], self.r[Pidx[row]])
             
         spks = np.transpose(spks)
         sdrive = np.transpose(sdrive)
