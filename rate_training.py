@@ -56,7 +56,6 @@ class rate_training(spike_training):
 
     # differential equation of dx/dt
     def dx(self, x, ext, itr):
-        print(itr)
         return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext[:, itr])
     
     def rk4_step(self, ext, itr):
