@@ -56,9 +56,14 @@ class rate_training(spike_training):
 
     # differential equation of dx/dt
     def dx(self, x, ext, itr):
-        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext[:, itr])
+        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
     
-    def rk4_step(self, ext, itr):
+    def rk4_step(self, stim, itr):
+        if itr < int(self.stim_off/self.dt):
+            ext = stim[:, itr]
+        else:
+            ext = np.zeros(self.N)
+
         x1 = self.dt * self.dx(self.x, ext, itr)
         x2 = self.dt * self.dx(self.x + x1/2, ext, itr)
         x3 = self.dt * self.dx(self.x + x2/2, ext, itr)
@@ -67,7 +72,10 @@ class rate_training(spike_training):
 
         self.x = x_next
 
-    def run_rate(self, rate_params, ufin, ufout): 
+    def train_rate(self, ufin, targets):
+        pass
+
+    def run_rate(self, stim): 
 
         # initialize variables to 0 
         # can be excluded to run from previous state
@@ -81,7 +89,7 @@ class rate_training(spike_training):
         timesteps = int(self.T/self.dt)
         while itr < timesteps:
             # RK4 for each timestep
-            self.rk4_step(ufin + ufout, itr)
+            self.rk4_step(stim, itr)
 
             t = t + self.dt
             itr = itr + 1
