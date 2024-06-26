@@ -8,7 +8,7 @@ def create_default_params():
     neuron_params = {
             'net_size': 200, # units in network
             'tau_x': 10, # ms, decay constant
-            'gain': 1.2 # multiplier
+            'gain': 1.2, # multiplier
         }
     time_params = {
             'total_time': 1000, # ms, total runtime
@@ -17,6 +17,7 @@ def create_default_params():
             'stim_off': 50 # ms
         }    
     train_params = {
+            'lam': 1, # learning rate factor
             'training_loops': 10, # number of training loops
             'train_every': 2 # ms, timestep of updating connectivity matrix
         }
@@ -46,6 +47,7 @@ class rate_training(spike_training):
         self.stim_on = time_params['stim_on']
         self.stim_off = time_params['stim_off']
 
+        self.lam = train_params['lam']
         self.nloop = train_params['training_loops']
         self.train_every = train_params['train_every']
 
@@ -72,12 +74,41 @@ class rate_training(spike_training):
 
         self.x = x_next
 
-    def train_rate(self, ufin, targets):
-        pass
+    def train_rate(self, stim, targets):
+        # initialize network activity to 0 
+        # can be excluded to run from previous state
+        self.x = np.zeros(self.N)
+
+        # track variables
+        x_vals = []
+
+        t = 0
+        itr = 0
+        timesteps = int(self.T/self.dt)
+
+        # training loop
+        for i in range(self.nloop):
+            print('training trial', i)
+            t = 0
+            itr = 0
+            
+            while itr < timesteps: 
+                
+                # calculate next step of diffeqs
+                self.rk4_step(stim, itr)
+
+                # update timestep
+                t = t + self.dt
+                itr = itr + 1
+
+                # track variables
+                x_vals.append(self.x)
+
+                # train matrix
 
     def run_rate(self, stim): 
 
-        # initialize variables to 0 
+        # initialize network activity to 0 
         # can be excluded to run from previous state
         self.x = np.zeros(self.N)
 
@@ -93,6 +124,8 @@ class rate_training(spike_training):
 
             t = t + self.dt
             itr = itr + 1
+
+            # track variables
             x_vals.append(self.x)
         
         return np.transpose(x_vals)
