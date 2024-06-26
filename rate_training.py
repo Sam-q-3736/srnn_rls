@@ -53,12 +53,13 @@ class rate_training(spike_training):
 
         self.run_time = run_params['runtime']
 
-        # track current membrane potential
+        # track current activity
         self.x = np.zeros(self.N)
+        self.Hx = np.tanh(self.x)
 
     # differential equation of dx/dt
     def dx(self, x, ext, itr):
-        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
+        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, self.Hx) + ext)
     
     def rk4_step(self, stim, itr):
         if itr < int(self.stim_off/self.dt):
@@ -73,14 +74,20 @@ class rate_training(spike_training):
         x_next = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
 
         self.x = x_next
+        self.Hx = np.tanh(self.x)
 
     def train_rate(self, stim, targets):
         # initialize network activity to 0 
         # can be excluded to run from previous state
         self.x = np.zeros(self.N)
+        self.Hx = np.tanh(self.x)
+
+        # initialize correlation matrix
+        P = np.eye(self.N) * 1/self.lam
 
         # track variables
         x_vals = []
+        Hx_vals = []
 
         t = 0
         itr = 0
@@ -104,16 +111,28 @@ class rate_training(spike_training):
                 # track variables
                 x_vals.append(self.x)
 
-                # train matrix
+                # train connectivity matrix
+                # update correlation matrix
+                numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
+                denom = 1 + np.dot(self.Hx, np.dot(P, self.Hx))
+                P = P - numer / denom
+
+                # update error
+        
+        x_vals = np.transpose(x_vals)
+        Hx_vals = np.transpose(Hx_vals)
+        return x_vals, Hx_vals
 
     def run_rate(self, stim): 
 
         # initialize network activity to 0 
         # can be excluded to run from previous state
         self.x = np.zeros(self.N)
+        self.Hx = np.tanh(self.x)
 
         # track variables
         x_vals = []
+        Hx_vals = []
 
         t = 0
         itr = 0
@@ -127,5 +146,8 @@ class rate_training(spike_training):
 
             # track variables
             x_vals.append(self.x)
+            Hx_vals.append(self.Hx)
         
-        return np.transpose(x_vals)
+        x_vals = np.transpose(x_vals)
+        Hx_vals = np.transpose(Hx_valse)
+        return x_vals, Hx_vals
