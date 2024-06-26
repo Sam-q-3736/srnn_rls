@@ -13,9 +13,9 @@ def create_default_params():
         }
         time_params = {
             'total_time': 1000, # ms, total runtime 
+            'dt': 0.1, # ms, timestep for differential equations
             'stim_on': 0, # ms, start of stimulus on
-            'stim_off': 50, # ms, stim off time
-            'dt': 0.1 # ms, timestep for differential equations
+            'stim_off': 50 # ms, stim off time
         }
         train_params = {
             'training_loops': 10, # number of training loops
@@ -34,6 +34,7 @@ def create_default_params():
 class QIF_training(spike_training):
 
     def __init__(self, neuron_params, time_params, train_params, connectivity_params, run_params):
+        # initialize connectivity matrix
         self.W_init = self.genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
         self.W_trained = np.copy(self.W_init)
 
@@ -44,9 +45,10 @@ class QIF_training(spike_training):
         self.lam = neuron_params['lam']
 
         self.T = time_params['total_time']
+        self.dt = time_params['dt']
+
         self.stim_on = time_params['stim_on']
         self.stim_off = time_params['stim_off']
-        self.dt = time_params['dt']
         
         self.nloop = train_params['training_loops']
         self.train_every = train_params['train_every']
