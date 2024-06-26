@@ -82,4 +82,4 @@ def run_QIF(neuron_params, time_params, W, stim, run_time):
     sdrive = np.transpose(sdrive)
     thetas = np.transpose(thetas)
     spk_rast = np.transpose(spk_rast)
-    return spks, sdrive, thetas
+    return spks, sdrive, thetas, spk_rast
