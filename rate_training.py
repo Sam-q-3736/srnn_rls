@@ -23,7 +23,7 @@ def create_default_params():
     connectivity_params = {
             'm': 0, # mean
             'std': 1/np.sqrt(200), # standard deviation, 1/sqrt(netsize)
-            'cp': 0.3, # connection probability
+            'cp': 1, # connection probability
         }
     run_params = {
             'runtime': 2000 # ms, runtime of trained network
@@ -55,14 +55,15 @@ class rate_training(spike_training):
         self.x = np.zeros(self.N)
 
     # differential equation of dx/dt
-    def dx(self, x, itr, ext):
+    def dx(self, x, ext, itr):
+        print(itr)
         return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext[:, itr])
     
     def rk4_step(self, ext, itr):
-        x1 = self.dt * self.dx(self.x, itr, ext)
-        x2 = self.dt * self.dx(self.x + x1/2, itr, ext)
-        x3 = self.dt * self.dx(self.x + x2/2, itr, ext)
-        x4 = self.dt * self.dx(self.x + x3, itr, ext)
+        x1 = self.dt * self.dx(self.x, ext, itr)
+        x2 = self.dt * self.dx(self.x + x1/2, ext, itr)
+        x3 = self.dt * self.dx(self.x + x2/2, ext, itr)
+        x4 = self.dt * self.dx(self.x + x3, ext, itr)
         x_next = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
 
         self.x = x_next
@@ -80,9 +81,8 @@ class rate_training(spike_training):
         itr = 0
         timesteps = int(self.T/self.dt)
         while itr < timesteps:
-            print(t)
             # RK4 for each timestep
-            self.rk4_step(ufin + ufout, t)
+            self.rk4_step(ufin + ufout, itr)
 
             t = t + self.dt
             itr = itr + 1
