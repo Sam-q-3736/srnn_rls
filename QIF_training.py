@@ -69,10 +69,7 @@ class QIF_training(spike_training):
         # does not include addition of new spikes
         
     def rk4_step(self, stim, itr): 
-        if itr < int(self.stim_off/self.dt):
-            ext = stim[:, itr]
-        else:
-            ext = np.zeros(self.N)
+        ext = stim[:, itr]
         
         # RK4 for theta
         k1 = self.dt * self.dtheta(self.theta, self.u + ext);

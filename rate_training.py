@@ -62,10 +62,7 @@ class rate_training(spike_training):
         return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, self.Hx) + ext)
     
     def rk4_step(self, stim, itr):
-        if itr < int(self.stim_off/self.dt):
-            ext = stim[:, itr]
-        else:
-            ext = np.zeros(self.N)
+        ext = stim[:, itr]
 
         x1 = self.dt * self.dx(self.x, ext, itr)
         x2 = self.dt * self.dx(self.x + x1/2, ext, itr)
@@ -153,5 +150,5 @@ class rate_training(spike_training):
             Hx_vals.append(self.Hx)
         
         x_vals = np.transpose(x_vals)
-        Hx_vals = np.transpose(Hx_valse)
+        Hx_vals = np.transpose(Hx_vals)
         return x_vals, Hx_vals
