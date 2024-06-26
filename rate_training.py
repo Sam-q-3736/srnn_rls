@@ -7,7 +7,8 @@ from spike_training import *
 def create_default_params():
     neuron_params = {
             'net_size': 200, # units in network
-            'tau_x': 10 # ms, decay constant
+            'tau_x': 10, # ms, decay constant
+            'gain': 1.2 # multiplier
         }
     time_params = {
             'total_time': 1000, # ms, total runtime
@@ -38,6 +39,7 @@ class rate_training(spike_training):
         # unpack parameters
         self.N = neuron_params['net_size']
         self.tau_x = neuron_params['tau_x']
+        self.gain = neuron_params['gain']
 
         self.T = time_params['total_time']
         self.dt = time_params['dt']
@@ -53,19 +55,19 @@ class rate_training(spike_training):
         self.x = np.zeros(self.N)
 
     # differential equation of dx/dt
-    def dx(self, x, t):
-        return 1/tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + fin[:, int(t/self.dt)] + fout[:, int(t/self.dt)])
+    def dx(self, x, t, ext):
+        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext[:, int(t/self.dt)])
     
-    def rk4_step(self, x, t, fin, fout):
-        x1 = self.dt * dx(x)
-        x2 = self.dt * dx(x + x1/2)
-        x3 = self.dt * dx(x + x2/2)
-        x4 = self.dt * dx(x + x3)
-        x_next = x + (x1 + 2*x2 + 2*x3 + x4) / 6
+    def rk4_step(self, ext, t):
+        x1 = self.dt * self.dx(self.x, t, ext)
+        x2 = self.dt * self.dx(self.x + x1/2, t, ext)
+        x3 = self.dt * self.dx(self.x + x2/2, t, ext)
+        x4 = self.dt * self.dx(self.x + x3, t, ext)
+        x_next = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
 
-        x = x_next
+        self.x = x_next
 
-    def run_rate(rate_params, ufin, ufout): 
+    def run_rate(self, rate_params, ufin, ufout): 
 
         # initialize variables to 0 
         # can be excluded to run from previous state
@@ -76,10 +78,11 @@ class rate_training(spike_training):
 
         t = 0
         while t < self.T: 
+            print(t)
             # RK4 for each timestep
-            self.rk4_step(self.x, t, ufin, ufout)
+            self.rk4_step(ufin + ufout, t)
 
-            t = t + dt
+            t = t + self.dt
             x_vals.append(self.x)
         
         return np.transpose(x_vals)
