@@ -150,7 +150,7 @@ class QIF_training(spike_training):
 
                 # train W matrix
                 if t > self.stim_off and t < int(self.T) \
-                    and np.mod(int(t/self.dt), int(self.train_every/self.dt)) == 0: # only train after initial stimulus
+                    and np.mod(itr, int(self.train_every/self.dt)) == 0: # only train after initial stimulus
                     
                     for row in range(self.N): # update each row of W by RLS
 
@@ -160,7 +160,7 @@ class QIF_training(spike_training):
                         Ps[row] = Ps[row] - numer / denom
 
                         # update error term
-                        err = targets[row][int(t/self.dt)] - \
+                        err = targets[row][itr] - \
                             np.dot(self.W_trained[row][Pidx[row]], self.r[Pidx[row]]) # error is scalar
 
                         # update W
