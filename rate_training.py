@@ -58,25 +58,26 @@ class rate_training(spike_training):
         self.Hx = np.tanh(self.x)
 
     # differential equation of dx/dt
-    def dx(self, x, ext, itr):
+    def dx(self, x, ext):
         return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, self.Hx) + ext)
     
     def rk4_step(self, stim, itr):
         ext = stim[:, itr]
 
-        x1 = self.dt * self.dx(self.x, ext, itr)
-        x2 = self.dt * self.dx(self.x + x1/2, ext, itr)
-        x3 = self.dt * self.dx(self.x + x2/2, ext, itr)
-        x4 = self.dt * self.dx(self.x + x3, ext, itr)
+        x1 = self.dt * self.dx(self.x, ext)
+        x2 = self.dt * self.dx(self.x + x1/2, ext)
+        x3 = self.dt * self.dx(self.x + x2/2, ext)
+        x4 = self.dt * self.dx(self.x + x3, ext)
         x_next = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
 
         self.x = x_next
         self.Hx = np.tanh(self.x)
 
     def train_rate(self, stim, targets):
-        # initialize network activity to 0 
+        # initialize network activity to uniform random behavior
         # can be excluded to run from previous state
-        self.x = np.zeros(self.N)
+        #self.x = np.zeros(self.N)
+        self.x = sp.stats.uniform.rvs(size = self.N) * 2 - 1
         self.Hx = np.tanh(self.x)
 
         # initialize correlation matrix
@@ -85,6 +86,7 @@ class rate_training(spike_training):
         # track variables
         x_vals = []
         Hx_vals = []
+        errs = []
 
         t = 0
         itr = 0
@@ -120,13 +122,13 @@ class rate_training(spike_training):
 
                     # update error
                     err = targets[:, itr] - np.dot(self.W_trained, self.Hx) # error is vector
-
+                    errs.append(np.linalg.norm(err))
                     # update connectivity
                     self.W_trained = self.W_trained + np.outer(err, np.dot(P, self.Hx))
 
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
-        return x_vals, Hx_vals
+        return x_vals, Hx_vals, errs
 
     def run_rate(self, stim): 
 
