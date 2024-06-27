@@ -87,6 +87,7 @@ class rate_training(spike_training):
         x_vals = []
         Hx_vals = []
         errs = []
+        dws = []
 
         t = 0
         itr = 0
@@ -125,10 +126,11 @@ class rate_training(spike_training):
                     errs.append(np.linalg.norm(err))
                     # update connectivity
                     self.W_trained = self.W_trained + np.outer(err, np.dot(P, self.Hx))
+                    dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
 
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
-        return x_vals, Hx_vals, errs
+        return x_vals, Hx_vals, errs, dws
 
     def run_rate(self, stim): 
 
@@ -158,3 +160,44 @@ class rate_training(spike_training):
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
         return x_vals, Hx_vals
+
+    def fullFORCE(self, ufin, ufout):
+        npar, tpar, trpar, cpar, rpar = create_default_params()
+        DRNN = rate_training(npar, tpar, trpar, cpar, rpar)
+
+        print('Training network...')
+        P = np.eye(self.N)/self.lam
+        Jd = DRNN.W_init
+        J = self.W_trained
+
+        dx = []
+        x = []
+
+        for i in range(self.nloop):
+            t = 0
+            itr = 0
+            print('training', i)
+
+            while itr < int(self.T/self.dt):
+                DRNN.rk4_step(ufin + ufout, itr)
+                rd = Jd @ DRNN.Hx
+                
+                self.rk4_step(ufin, itr)
+                
+                J = self.W_trained
+                r = self.Hx
+
+                dx.append(DRNN.Hx)
+                x.append(self.Hx)
+
+                if np.mod(itr, int(self.train_every/self.dt)):
+                    J_err = (np.dot(J,r) - np.dot(Jd,rd) 
+                                    -np.dot(ufout))
+                    Pr = np.dot(P,r)
+                    k = np.transpose(Pr)/(1 + np.dot(np.transpose(r), Pr))
+                    P = P - np.dot(Pr,k)
+
+                    J = J - np.dot(J_err, k)
+                    self.W_trained = J  
+
+        return dx, x
