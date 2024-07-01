@@ -6,15 +6,15 @@ from spike_training import *
 
 def create_default_params():
     neuron_params = {
-            'net_size': 200, # units in network
+            'net_size': 300, # units in network
             'tau_x': 10, # ms, decay constant
-            'gain': 1.2, # multiplier
+            'gain': 1, # multiplier
         }
     time_params = {
             'total_time': 1000, # ms, total runtime
             'dt': 0.1, # ms
             'stim_on': 0, # ms
-            'stim_off': 50 # ms
+            'stim_off': 3 # ms, matches run-forward time in FF_Demo
         }    
     train_params = {
             'lam': 1, # learning rate factor
@@ -76,7 +76,7 @@ class rate_training(spike_training):
     def train_rate(self, stim, targets):
         # initialize network activity to uniform random behavior
         # can be excluded to run from previous state
-        #self.x = np.zeros(self.N)
+        # self.x = np.zeros(self.N)
         self.x = sp.stats.uniform.rvs(size = self.N) * 2 - 1
         self.Hx = np.tanh(self.x)
 
@@ -95,7 +95,8 @@ class rate_training(spike_training):
 
         # training loop
         for i in range(self.nloop):
-            print('training trial', i)
+            if np.mod(i, 50) == 0:
+                print('training trial', i)
             t = 0
             itr = 0
             
@@ -114,7 +115,8 @@ class rate_training(spike_training):
 
                 # train connectivity matrix
                 if itr > int(self.stim_off/self.dt) and itr < timesteps \
-                    and np.mod(itr, int(self.train_every/self.dt)) == 0:
+                    and np.random.rand() < 1/(self.train_every * self.dt):
+                    # and np.mod(itr, int(self.train_every/self.dt)) == 0:
                     
                     # update correlation matrix
                     numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
@@ -191,13 +193,14 @@ class rate_training(spike_training):
                 x.append(self.Hx)
 
                 if np.mod(itr, int(self.train_every/self.dt)):
-                    J_err = (np.dot(J,r) - np.dot(Jd,rd) 
-                                    -np.dot(ufout))
+                    J_err = (np.dot(J,r) - np.dot(Jd,rd) - ufout[:, itr])
                     Pr = np.dot(P,r)
                     k = np.transpose(Pr)/(1 + np.dot(np.transpose(r), Pr))
                     P = P - np.dot(Pr,k)
 
                     J = J - np.dot(J_err, k)
                     self.W_trained = J  
+                
+                itr = itr + 1
 
         return dx, x
