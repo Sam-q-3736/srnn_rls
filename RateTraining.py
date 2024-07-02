@@ -97,7 +97,7 @@ class RateTraining(SpikeTraining):
 
         # training loop
         for i in range(self.nloop):
-            if np.mod(i, 50) == 0:
+            if np.mod(i, 25) == 0:
                 print('training trial', i)
             t = 0
             itr = 0
@@ -119,9 +119,7 @@ class RateTraining(SpikeTraining):
                 if itr > int(self.stim_off/self.dt) and itr < timesteps \
                     and np.random.rand() < 1/(self.train_every * self.dt):
                     # and np.mod(itr, int(self.train_every/self.dt)) == 0:
-                    
-                    r = np.tanh(self.x)
-                    
+                                        
                     # update correlation matrix
                     numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
                     denom = 1 + np.dot(np.transpose(self.Hx), np.dot(P, self.Hx))
@@ -131,11 +129,11 @@ class RateTraining(SpikeTraining):
                     # update error
                     err = np.dot(self.W_trained, self.Hx) - targets[:, itr] # error is vector
                     errs.append(np.linalg.norm(err))
+
                     # update connectivity
                     self.W_trained = self.W_trained - np.outer(err, np.dot(P, self.Hx))
-                    # self.W_trained = self.W_trained - np.dot(err, k)
-                    # dws.append(np.linalg.norm(np.dot(err, k)))
-                    dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
+
+                    #dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
                     rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - targets[:, itr]) / err))
 
         x_vals = np.transpose(x_vals)
