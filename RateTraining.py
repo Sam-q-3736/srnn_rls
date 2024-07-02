@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
-from spike_training import *
+from SpikeTraining import *
 
 def create_default_params():
     neuron_params = {
@@ -31,7 +31,7 @@ def create_default_params():
         }
     return neuron_params, time_params, train_params, connectivity_params, run_params
 
-class rate_training(spike_training): 
+class RateTraining(SpikeTraining): 
     def __init__(self, neuron_params, time_params, train_params, connectivity_params, run_params):
         # initialize connectivity matrix
         self.W_init = self.genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
