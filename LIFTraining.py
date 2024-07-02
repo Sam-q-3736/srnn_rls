@@ -19,7 +19,7 @@ def create_default_params_LIF():
             'total_time': 1000, # ms, total runtime
             'dt': 0.1, # ms
             'stim_on': 0, # ms
-            'stim_off': 3 # ms, matches run-forward time in FF_Demo
+            'stim_off': 50 # ms, matches run-forward time in FF_Demo
         }    
     train_params = {
             'lam': 1, # learning rate factor
@@ -42,6 +42,7 @@ class LIFTraining(SpikeTraining):
         self.N = neuron_params['net_size']
         self.tau_s = neuron_params['tau_s']
         self.tau_f = neuron_params['tau_f']
+        self.tau_m = neuron_params['tau_m']
         self.gain = neuron_params['gain']
         self.bias = neuron_params['bias']
         self.v_thr = neuron_params['v_thr']
@@ -64,7 +65,7 @@ class LIFTraining(SpikeTraining):
         self.slow = np.zeros(self.N)
         self.fast = np.zeros(self.N)
         self.refract = np.zeros(self.N) # time since last refractory period
-        self.V = np.zeros(self.N) - self.v_rest # membrane voltages
+        self.V = np.zeros(self.N) + self.v_rest # membrane voltages
 
         # fast and slow connectivity 
         self.Jf = self.genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
@@ -88,16 +89,46 @@ class LIFTraining(SpikeTraining):
         ds = self.dt * self.dslow()
         df = self.dt * self.dfast()
 
+        self.slow += ds
+        self.fast += df
+
         # change in membrane potential
         dV = self.dt * self.dV(ext)
+        self.V += dV
+
         idxr = self.refract > 0 # get neurons in refractory period
-        dV[idxr] = self.v_rest # hold at rest voltage
+        self.V[idxr] = self.v_rest # hold at rest voltage
         self.refract[idxr] -= 1 # decrease refractory period
 
-        idxs = dV > self.v_thr # get neurons which spike
+        idxs = self.V > self.v_thr # get neurons which spike
         self.refract[idxs] = int(self.t_refract/self.dt) # set refractory periods
-        ds[idxs] += 1 
-        df[idxs] += 1
+        self.slow[idxs] += 1 
+        self.fast[idxs] += 1
 
     def run_LIF(self, stim): 
-        pass
+        
+        # initialize variables to base states
+        self.slow = np.zeros(self.N)
+        self.fast = np.zeros(self.N)
+        self.refract = np.zeros(self.N)
+        self.V = np.zeros(self.N) + self.v_rest
+
+        itr = 0
+        timesteps = int(self.run_time / self.dt)
+
+        # tracking variables
+        voltage = np.zeros((timesteps, self.N))
+        slow_curr = np.zeros((timesteps, self.N))
+        fast_curr = np.zeros((timesteps, self.N))
+
+        while(itr < timesteps):
+            
+            self.step(stim, itr)
+            voltage[itr] = np.copy(self.V)
+            slow_curr[itr] = np.copy(self.slow)
+            fast_curr[itr] = np.copy(self.fast)
+            
+            itr += 1
+
+        return np.transpose(voltage), np.transpose(slow_curr), np.transpose(fast_curr)
+
