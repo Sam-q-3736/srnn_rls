@@ -11,14 +11,14 @@ def create_default_params_rate():
             'gain': 1, # multiplier
         }
     time_params = {
-            'total_time': 1000, # ms, total runtime
-            'dt': 0.1, # ms
+            'total_time': 2000, # ms, total runtime
+            'dt': 1, # ms
             'stim_on': 0, # ms
-            'stim_off': 3 # ms, matches run-forward time in FF_Demo
+            'stim_off': 0 # ms, matches run-forward time in FF_Demo
         }    
     train_params = {
             'lam': 1, # learning rate factor
-            'training_loops': 10, # number of training loops
+            'training_loops': 20, # number of training loops
             'train_every': 2 # ms, timestep of updating connectivity matrix
         }
     connectivity_params = {
@@ -126,7 +126,7 @@ class RateTraining(SpikeTraining):
                     numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
                     denom = 1 + np.dot(np.transpose(self.Hx), np.dot(P, self.Hx))
                     P = P - numer / denom
-                    k = np.transpose(np.dot(P, self.Hx)) / denom
+                    # k = np.transpose(np.dot(P, self.Hx)) / denom
                     
                     # update error
                     err = np.dot(self.W_trained, self.Hx) - targets[:, itr] # error is vector
@@ -146,8 +146,8 @@ class RateTraining(SpikeTraining):
 
         # initialize network activity to 0 
         # can be excluded to run from previous state
-        self.x = np.zeros(self.N)
-        self.Hx = np.tanh(self.x)
+        # self.x = np.zeros(self.N)
+        # self.Hx = np.tanh(self.x)
 
         # track variables
         x_vals = []
@@ -173,42 +173,75 @@ class RateTraining(SpikeTraining):
 
     def fullFORCE(self, ufin, ufout):
         npar, tpar, trpar, cpar, rpar = create_default_params_rate()
+        rpar['runtime'] = self.T
         DRNN = RateTraining(npar, tpar, trpar, cpar, rpar)
-
-        print('Training network...')
-        P = np.eye(self.N)/self.lam
         Jd = DRNN.W_init
-        J = self.W_trained
 
-        dx = []
-        x = []
+        print('Stabilizing networks')
+        for i in range(3): # 3 used in full-FORCE
+            DRNN.run_rate(ufin + ufout)
+            self.run_rate(ufin)
 
+        # initialize variables
+        timesteps = int(self.T/self.dt)
+        P = np.eye(self.N) * 1/self.lam
+        
+        x_vals = []
+        Hx_vals = []
+        errs = []
+        dws = []
+        rel_errs = []
+        aux_targs = []
+
+        itr = 0
+        t = 0
+        print(self.nloop, 'total trainings')
         for i in range(self.nloop):
-            t = 0
+            if i % 5 == 0: print('training:', i)
+            # _, dHx = DRNN.run_rate(ufin + ufout)
+            # aux_targs = ufout + Jd @ dHx
+            
             itr = 0
-            print('training', i)
-
-            while itr < int(self.T/self.dt):
-                DRNN.rk4_step(ufin + ufout, itr)
-                rd = Jd @ DRNN.Hx
+            t = 0
+            while itr < timesteps: 
                 
+                # calculate next step of diffeqs
                 self.rk4_step(ufin, itr)
+                DRNN.rk4_step(ufin + ufout, itr)
+                aux_targ = Jd @ DRNN.Hx + ufout[:, itr]
+
+                # track variables
+                # x_vals.append(self.x)
+                # Hx_vals.append(self.Hx)
+                # aux_targs.append(aux_targ)
+
+                # train connectivity matrix
+                if np.random.rand() < 1/(self.train_every * self.dt):
+                    # and np.mod(itr, int(self.train_every/self.dt)) == 0:
+                                        
+                    # update correlation matrix
+                    numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
+                    denom = 1 + np.dot(np.transpose(self.Hx), np.dot(P, self.Hx))
+                    P = P - numer / denom
+                    # k = np.transpose(np.dot(P, self.Hx)) / denom
+                    
+                    # update error
+                    err = np.dot(self.W_trained, self.Hx) - aux_targ # error is vector
+
+                    # update connectivity
+                    self.W_trained = self.W_trained - np.outer(err, np.dot(P, self.Hx))
+                    # self.W_trained = self.W_trained - np.dot(err, k)
+                    # dws.append(np.linalg.norm(np.dot(err, k)))
+                    
+                    # errs.append(np.linalg.norm(err))
+                    # dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
+                    # rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targ) / err))
                 
-                J = self.W_trained
-                r = self.Hx
-
-                dx.append(DRNN.Hx)
-                x.append(self.Hx)
-
-                if np.mod(itr, int(self.train_every/self.dt)):
-                    J_err = (np.dot(J,r) - np.dot(Jd,rd) - ufout[:, itr])
-                    Pr = np.dot(P,r)
-                    k = np.transpose(Pr)/(1 + np.dot(np.transpose(r), Pr))
-                    P = P - np.dot(Pr,k)
-
-                    J = J - np.dot(J_err, k)
-                    self.W_trained = J  
-                
+                # update timestep
+                t = t + self.dt
                 itr = itr + 1
 
-        return dx, x
+        x_vals = np.transpose(x_vals)
+        Hx_vals = np.transpose(Hx_vals)
+        aux_targs = np.transpose(aux_targs)
+        return x_vals, Hx_vals, errs, dws, rel_errs, aux_targs
