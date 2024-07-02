@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from SpikeTraining import *
 
-def create_default_params():
+def create_default_params_rate():
     neuron_params = {
             'net_size': 300, # units in network
             'tau_x': 10, # ms, decay constant
@@ -172,8 +172,8 @@ class RateTraining(SpikeTraining):
         return x_vals, Hx_vals
 
     def fullFORCE(self, ufin, ufout):
-        npar, tpar, trpar, cpar, rpar = create_default_params()
-        DRNN = rate_training(npar, tpar, trpar, cpar, rpar)
+        npar, tpar, trpar, cpar, rpar = create_default_params_rate()
+        DRNN = RateTraining(npar, tpar, trpar, cpar, rpar)
 
         print('Training network...')
         P = np.eye(self.N)/self.lam
