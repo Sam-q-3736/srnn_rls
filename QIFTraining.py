@@ -2,14 +2,13 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
-from spike_training import *
+from SpikeTraining import *
 
-def create_default_params():
+def create_default_params_QIF():
         neuron_params = {
             'net_size': 200, # units in network
             'tau': 1, # ms, neuron decay constant
             'tau_s': 20, # ms, synaptic filtering constant
-            'lam': 1 # learning rate factor
         }
         time_params = {
             'total_time': 1000, # ms, total runtime 
@@ -18,6 +17,7 @@ def create_default_params():
             'stim_off': 50 # ms, stim off time
         }
         train_params = {
+            'lam': 1, # learning rate factor
             'training_loops': 10, # number of training loops
             'train_every': 2 # ms, timestep of updating connectivity matrix
         }
@@ -31,7 +31,7 @@ def create_default_params():
         }
         return neuron_params, time_params, train_params, connectivity_params, run_params
 
-class QIF_training(spike_training):
+class QIFTraining(SpikeTraining):
 
     def __init__(self, neuron_params, time_params, train_params, connectivity_params, run_params):
         # initialize connectivity matrix
@@ -42,7 +42,6 @@ class QIF_training(spike_training):
         self.N = neuron_params['net_size']
         self.tau = neuron_params['tau']
         self.tau_s = neuron_params['tau_s']
-        self.lam = neuron_params['lam']
 
         self.T = time_params['total_time']
         self.dt = time_params['dt']
@@ -50,6 +49,7 @@ class QIF_training(spike_training):
         self.stim_on = time_params['stim_on']
         self.stim_off = time_params['stim_off']
         
+        self.lam = train_params['lam']
         self.nloop = train_params['training_loops']
         self.train_every = train_params['train_every']
 
@@ -69,10 +69,7 @@ class QIF_training(spike_training):
         # does not include addition of new spikes
         
     def rk4_step(self, stim, itr): 
-        if t < self.stim_off:
-            ext = stim[:, itr]
-        else:
-            ext = np.zeros(self.N)
+        ext = stim[:, itr]
         
         # RK4 for theta
         k1 = self.dt * self.dtheta(self.theta, self.u + ext);
@@ -149,8 +146,8 @@ class QIF_training(spike_training):
                 self.spk_t = np.zeros(self.N)
 
                 # train W matrix
-                if t > self.stim_off and t < int(self.T) \
-                    and np.mod(int(t/self.dt), int(self.train_every/self.dt)) == 0: # only train after initial stimulus
+                if itr > int(self.stim_off/self.dt) and itr < timesteps \
+                    and np.mod(itr, int(self.train_every/self.dt)) == 0: # only train after initial stimulus
                     
                     for row in range(self.N): # update each row of W by RLS
 
@@ -160,12 +157,12 @@ class QIF_training(spike_training):
                         Ps[row] = Ps[row] - numer / denom
 
                         # update error term
-                        err = targets[row][int(t/self.dt)] - \
-                            np.dot(self.W_trained[row][Pidx[row]], self.r[Pidx[row]]) # error is scalar
+                        err = targets[row, itr] - \
+                            np.dot(self.W_trained[row, Pidx[row]], self.r[Pidx[row]]) # error is scalar
 
                         # update W
-                        self.W_trained[row][Pidx[row]] \
-                            = self.W_trained[row][Pidx[row]] + err * np.dot(Ps[row], self.r[Pidx[row]])
+                        self.W_trained[row, Pidx[row]] \
+                            = self.W_trained[row, Pidx[row]] + err * np.dot(Ps[row], self.r[Pidx[row]])
             
         spks = np.transpose(spks)
         sdrive = np.transpose(sdrive)

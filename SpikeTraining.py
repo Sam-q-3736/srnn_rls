@@ -3,7 +3,7 @@ import scipy as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-class spike_training:
+class SpikeTraining:
 
     def create_default_params():
         raise NotImplementedError
