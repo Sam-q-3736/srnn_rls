@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from SpikeTraining import *
 
-def create_default_params():
+def create_default_params_QIF():
         neuron_params = {
             'net_size': 200, # units in network
             'tau': 1, # ms, neuron decay constant
