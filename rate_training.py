@@ -59,7 +59,9 @@ class rate_training(spike_training):
 
     # differential equation of dx/dt
     def dx(self, x, ext):
-        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, self.Hx) + ext)
+        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
+        # return 1/self.tau_x * (-x + self.gain * np.dot(np.tanh(x), self.W_trained) + ext)
+
     
     def rk4_step(self, stim, itr):
         ext = stim[:, itr]
@@ -68,9 +70,8 @@ class rate_training(spike_training):
         x2 = self.dt * self.dx(self.x + x1/2, ext)
         x3 = self.dt * self.dx(self.x + x2/2, ext)
         x4 = self.dt * self.dx(self.x + x3, ext)
-        x_next = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
 
-        self.x = x_next
+        self.x = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
         self.Hx = np.tanh(self.x)
 
     def train_rate(self, stim, targets):
@@ -88,6 +89,7 @@ class rate_training(spike_training):
         Hx_vals = []
         errs = []
         dws = []
+        rel_errs = []
 
         t = 0
         itr = 0
@@ -118,21 +120,27 @@ class rate_training(spike_training):
                     and np.random.rand() < 1/(self.train_every * self.dt):
                     # and np.mod(itr, int(self.train_every/self.dt)) == 0:
                     
+                    r = np.tanh(self.x)
+                    
                     # update correlation matrix
                     numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
-                    denom = 1 + np.dot(self.Hx, np.dot(P, self.Hx))
+                    denom = 1 + np.dot(np.transpose(self.Hx), np.dot(P, self.Hx))
                     P = P - numer / denom
-
+                    k = np.transpose(np.dot(P, self.Hx)) / denom
+                    
                     # update error
-                    err = targets[:, itr] - np.dot(self.W_trained, self.Hx) # error is vector
+                    err = np.dot(self.W_trained, self.Hx) - targets[:, itr] # error is vector
                     errs.append(np.linalg.norm(err))
                     # update connectivity
-                    self.W_trained = self.W_trained + np.outer(err, np.dot(P, self.Hx))
+                    self.W_trained = self.W_trained - np.outer(err, np.dot(P, self.Hx))
+                    # self.W_trained = self.W_trained - np.dot(err, k)
+                    # dws.append(np.linalg.norm(np.dot(err, k)))
                     dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
+                    rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - targets[:, itr]) / err))
 
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
-        return x_vals, Hx_vals, errs, dws
+        return x_vals, Hx_vals, errs, dws, rel_errs
 
     def run_rate(self, stim): 
 
