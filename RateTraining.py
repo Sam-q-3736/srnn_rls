@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
-from SpikeTraining import *
+from SpikeTraining import SpikeTraining
 
 def create_default_params_rate():
     neuron_params = {
@@ -23,7 +23,7 @@ def create_default_params_rate():
         }
     connectivity_params = {
             'm': 0, # mean
-            'std': 1/np.sqrt(200), # standard deviation, 1/sqrt(netsize)
+            'std': 1/np.sqrt(neuron_params['net_size']), # standard deviation, 1/sqrt(netsize)
             'cp': 1, # connection probability
         }
     run_params = {
