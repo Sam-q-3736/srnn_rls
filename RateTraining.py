@@ -36,6 +36,8 @@ class RateTraining(SpikeTraining):
         # initialize connectivity matrix
         self.W_init = self.genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
         self.W_trained = np.copy(self.W_init)
+        # initalize output weights
+        self.W_out = np.zeros(neuron_params['net_size'])
 
         # unpack parameters
         self.N = neuron_params['net_size']
@@ -88,7 +90,6 @@ class RateTraining(SpikeTraining):
         x_vals = []
         Hx_vals = []
         errs = []
-        dws = []
         rel_errs = []
 
         t = 0
@@ -138,7 +139,7 @@ class RateTraining(SpikeTraining):
 
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
-        return x_vals, Hx_vals, errs, dws, rel_errs
+        return x_vals, Hx_vals, errs, rel_errs
 
     def run_rate(self, stim): 
 
@@ -169,25 +170,36 @@ class RateTraining(SpikeTraining):
         Hx_vals = np.transpose(Hx_vals)
         return x_vals, Hx_vals
 
-    def fullFORCE(self, ufin, ufout):
+    def fullFORCE(self, fin, fout):
         npar, tpar, trpar, cpar, rpar = create_default_params_rate()
         rpar['runtime'] = self.T
         DRNN = RateTraining(npar, tpar, trpar, cpar, rpar)
         Jd = DRNN.W_init
 
+        # initialize random weighting inputs
+        uind = sp.stats.uniform.rvs(size = npar['net_size']) * 2 - 1
+        uin = sp.stats.uniform.rvs(size = npar['net_size']) * 2 - 1
+        uout = sp.stats.uniform.rvs(size = npar['net_size']) * 2 - 1
+
+        # generate inputs
+        ufind = np.transpose(np.multiply(fin, uind))
+        ufin = np.transpose(np.multiply(fin, uin))
+        ufout = np.transpose(np.multiply(fout, uout))
+
         print('Stabilizing networks')
         for i in range(3): # 3 used in full-FORCE
-            DRNN.run_rate(ufin + ufout)
+            DRNN.run_rate(ufind + ufout)
             self.run_rate(ufin)
 
         # initialize variables
         timesteps = int(self.T/self.dt)
         P = np.eye(self.N) * 1/self.lam
         
+        wout = np.zeros(self.N)
+        
         x_vals = []
         Hx_vals = []
         errs = []
-        dws = []
         rel_errs = []
         aux_targs = []
 
@@ -195,7 +207,7 @@ class RateTraining(SpikeTraining):
         t = 0
         print(self.nloop, 'total trainings')
         for i in range(self.nloop):
-            if i % 5 == 0: print('training:', i)
+            if i % 20 == 0: print('training:', i)
             # _, dHx = DRNN.run_rate(ufin + ufout)
             # aux_targs = ufout + Jd @ dHx
             
@@ -205,13 +217,13 @@ class RateTraining(SpikeTraining):
                 
                 # calculate next step of diffeqs
                 self.rk4_step(ufin, itr)
-                DRNN.rk4_step(ufin + ufout, itr)
+                DRNN.rk4_step(ufind + ufout, itr)
                 aux_targ = Jd @ DRNN.Hx + ufout[:, itr]
 
                 # track variables
-                # x_vals.append(self.x)
-                # Hx_vals.append(self.Hx)
-                # aux_targs.append(aux_targ)
+                x_vals.append(self.x)
+                Hx_vals.append(self.Hx)
+                aux_targs.append(aux_targ)
 
                 # train connectivity matrix
                 if np.random.rand() < 1/(self.train_every * self.dt):
@@ -225,15 +237,17 @@ class RateTraining(SpikeTraining):
                     
                     # update error
                     err = np.dot(self.W_trained, self.Hx) - aux_targ # error is vector
+                    oerr = np.dot(self.W_out, self.Hx) - fout[itr] # error is scalar
 
                     # update connectivity
                     self.W_trained = self.W_trained - np.outer(err, np.dot(P, self.Hx))
-                    # self.W_trained = self.W_trained - np.dot(err, k)
-                    # dws.append(np.linalg.norm(np.dot(err, k)))
+
+                    # update output weights
+                    self.W_out = self.W_out - oerr * np.dot(P, self.Hx)
                     
-                    # errs.append(np.linalg.norm(err))
-                    # dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
-                    # rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targ) / err))
+                    # track training errors
+                    errs.append(np.linalg.norm(err))
+                    rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targ) / err))
                 
                 # update timestep
                 t = t + self.dt
@@ -242,4 +256,4 @@ class RateTraining(SpikeTraining):
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
         aux_targs = np.transpose(aux_targs)
-        return x_vals, Hx_vals, errs, dws, rel_errs, aux_targs
+        return x_vals, Hx_vals, errs, rel_errs, aux_targs, ufin, ufout
