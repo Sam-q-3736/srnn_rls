@@ -27,4 +27,4 @@ class SpikeTraining:
         spk_times = []
         for idx in np.unique(spk_inds):
             spk_times.append(spk_t[spk_inds == idx])
-        plt.eventplot(spk_times[inds]);
+        plt.eventplot(spk_times[inds])

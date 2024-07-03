@@ -64,7 +64,6 @@ class RateTraining(SpikeTraining):
         return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
         # return 1/self.tau_x * (-x + self.gain * np.dot(np.tanh(x), self.W_trained) + ext)
 
-    
     def rk4_step(self, stim, itr):
         ext = stim[:, itr]
 
@@ -74,6 +73,12 @@ class RateTraining(SpikeTraining):
         x4 = self.dt * self.dx(self.x + x3, ext)
 
         self.x = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
+        self.Hx = np.tanh(self.x)
+
+    def step(self, stim, itr):
+        ext = stim[:, itr]
+
+        self.x = self.x + self.dt * self.dx(self.x, ext)
         self.Hx = np.tanh(self.x)
 
     def train_rate(self, stim, targets):
@@ -108,10 +113,6 @@ class RateTraining(SpikeTraining):
                 # calculate next step of diffeqs
                 self.rk4_step(stim, itr)
 
-                # update timestep
-                t = t + self.dt
-                itr = itr + 1
-
                 # track variables
                 x_vals.append(self.x)
                 Hx_vals.append(self.Hx)
@@ -120,10 +121,12 @@ class RateTraining(SpikeTraining):
                 if itr > int(self.stim_off/self.dt) and itr < timesteps \
                     and np.random.rand() < 1/(self.train_every * self.dt):
                     # and np.mod(itr, int(self.train_every/self.dt)) == 0:
-                                        
+
+                    Phx = np.dot(P, self.Hx)
+
                     # update correlation matrix
-                    numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
-                    denom = 1 + np.dot(np.transpose(self.Hx), np.dot(P, self.Hx))
+                    numer = np.outer(Phx, Phx)
+                    denom = 1 + np.dot(np.transpose(self.Hx), Phx)
                     P = P - numer / denom
                     # k = np.transpose(np.dot(P, self.Hx)) / denom
                     
@@ -136,6 +139,10 @@ class RateTraining(SpikeTraining):
 
                     #dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
                     rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - targets[:, itr]) / err))
+                
+                # update timestep
+                t = t + self.dt
+                itr = itr + 1
 
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
@@ -152,19 +159,21 @@ class RateTraining(SpikeTraining):
         x_vals = []
         Hx_vals = []
 
-        t = 0
+        #t = 0
         itr = 0
         timesteps = int(self.T/self.dt)
         while itr < timesteps:
             # RK4 for each timestep
-            self.rk4_step(stim, itr)
-
-            t = t + self.dt
-            itr = itr + 1
+            #self.rk4_step(stim, itr)
+            self.step(stim, itr)
 
             # track variables
             x_vals.append(self.x)
             Hx_vals.append(self.Hx)
+
+            #t = t + self.dt
+            itr = itr + 1
+            print(itr)
         
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
@@ -188,23 +197,24 @@ class RateTraining(SpikeTraining):
 
         print('Stabilizing networks')
         for i in range(3): # 3 used in full-FORCE
+            print(i)
             DRNN.run_rate(ufind + ufout)
             self.run_rate(ufin)
 
         # initialize variables
         timesteps = int(self.T/self.dt)
-        P = np.eye(self.N) * 1/self.lam
-        
-        wout = np.zeros(self.N)
-        
+        P = np.eye(self.N) / self.lam
+                
+        # tracking variables
         x_vals = []
         Hx_vals = []
         errs = []
         rel_errs = []
         aux_targs = []
 
+        # begin training
         itr = 0
-        t = 0
+        #t = 0
         print(self.nloop, 'total trainings')
         for i in range(self.nloop):
             if i % 20 == 0: print('training:', i)
@@ -212,13 +222,13 @@ class RateTraining(SpikeTraining):
             # aux_targs = ufout + Jd @ dHx
             
             itr = 0
-            t = 0
+            #t = 0
             while itr < timesteps: 
                 
                 # calculate next step of diffeqs
-                self.rk4_step(ufin, itr)
-                DRNN.rk4_step(ufind + ufout, itr)
-                aux_targ = Jd @ DRNN.Hx + ufout[:, itr]
+                self.step(ufin, itr)
+                DRNN.step(ufind + ufout, itr)
+                aux_targ = np.dot(Jd, DRNN.Hx) + ufout[:, itr]
 
                 # track variables
                 x_vals.append(self.x)
@@ -228,29 +238,31 @@ class RateTraining(SpikeTraining):
                 # train connectivity matrix
                 if np.random.rand() < 1/(self.train_every * self.dt):
                     # and np.mod(itr, int(self.train_every/self.dt)) == 0:
-                                        
+
+                    Phx = np.dot(P, self.Hx)
+     
                     # update correlation matrix
-                    numer = np.outer(np.dot(P, self.Hx), np.dot(P, self.Hx))
-                    denom = 1 + np.dot(np.transpose(self.Hx), np.dot(P, self.Hx))
-                    P = P - numer / denom
-                    # k = np.transpose(np.dot(P, self.Hx)) / denom
+                    # numer = np.outer(Phx, Phx)
+                    # denom = 1 + np.dot(np.transpose(self.Hx), Phx)
+                    k = Phx / (1 + np.dot(np.transpose(self.Hx), Phx))
+                    P = P - np.outer(Phx, k)
                     
                     # update error
                     err = np.dot(self.W_trained, self.Hx) - aux_targ # error is vector
                     oerr = np.dot(self.W_out, self.Hx) - fout[itr] # error is scalar
 
                     # update connectivity
-                    self.W_trained = self.W_trained - np.outer(err, np.dot(P, self.Hx))
+                    self.W_trained = self.W_trained - np.outer(err, k)
 
                     # update output weights
-                    self.W_out = self.W_out - oerr * np.dot(P, self.Hx)
+                    self.W_out = self.W_out - oerr * k
                     
                     # track training errors
                     errs.append(np.linalg.norm(err))
                     rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targ) / err))
                 
                 # update timestep
-                t = t + self.dt
+                # t = t + self.dt
                 itr = itr + 1
 
         x_vals = np.transpose(x_vals)
