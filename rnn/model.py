@@ -61,16 +61,20 @@ class RateModel(BaseModel):
         }
         return p
 
-    def __init__(self, params):
+    def __init__(self, params, inp_out_hint_fn, **kwargs):
         self.p = params
         self.x = np.random.randn(self.p['N'])
-        self.J = np.zeros((self.p['N'], self.p['N']))
+        self.model = dict(
+            J = np.zeros((self.p['N'], self.p['N'])),
+
+        )
+        self.inp_out_hint_fn = inp_out_hint_fn
     
     def run(self):
-        inp, out, hint = 
+        inp, out, hint = self.inp_out_hint_fn(p['dt'])
         def dx(dt, x, total_inputs):
             # return dt/self.p['tau'] - x + self.J * np.tanh(x) + 
-        pass
+            pass
 
     def train(self):
         pass
