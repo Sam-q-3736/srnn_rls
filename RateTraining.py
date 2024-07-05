@@ -173,7 +173,6 @@ class RateTraining(SpikeTraining):
 
             #t = t + self.dt
             itr = itr + 1
-            print(itr)
         
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
@@ -197,7 +196,6 @@ class RateTraining(SpikeTraining):
 
         print('Stabilizing networks')
         for i in range(3): # 3 used in full-FORCE
-            print(i)
             DRNN.run_rate(ufind + ufout)
             self.run_rate(ufin)
 

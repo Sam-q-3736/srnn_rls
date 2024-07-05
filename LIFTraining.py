@@ -15,10 +15,10 @@ def create_default_params_LIF():
             'v_rest': -65, # mV, resting voltage
             't_refract': 2, # ms, refractory period 
             'total_time': 1000, # ms, total runtime
-            'dt': 0.1, # ms
+            'dt': 1, # ms
             'stim_on': 0, # ms
             'stim_off': 50, # ms, matches run-forward time in FF_Demo
-            'lam': 1, # learning rate factor
+            'lam': 5, # learning rate factor
             'training_loops': 10, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
             'm': -57/300, # mean
@@ -99,11 +99,11 @@ class LIFTraining(SpikeTraining):
 
     def run_LIF(self, stim): 
         
-        # initialize variables to base states
-        self.slow = np.zeros(self.N)
-        self.fast = np.zeros(self.N)
-        self.refract = np.zeros(self.N)
-        self.V = np.zeros(self.N) + self.v_rest
+        # # initialize variables to base states
+        # self.slow = np.zeros(self.N)
+        # self.fast = np.zeros(self.N)
+        # self.refract = np.zeros(self.N)
+        # self.V = np.zeros(self.N) + self.v_rest
 
         itr = 0
         timesteps = int(self.run_time / self.dt)
@@ -141,11 +141,22 @@ class LIFTraining(SpikeTraining):
                     # train matrix
                     Ps = np.dot(P, self.slow)
 
-                    k = Ps / (1 + np.dot(np.transpose(self.slow), Ps))
+                    k = Ps / (1 + np.dot(self.slow, Ps))
                     P = P - np.outer(Ps, k)
 
                     err = np.dot(self.Js, self.slow) - targ[:, itr]
 
                     self.Js = self.Js - np.outer(err, k)
+
+                    # Ps = np.dot(P, self.slow)[:, np.newaxis]
+
+                    # k = np.transpose(Ps) \
+                    #     / (1 + np.dot(np.transpose(self.slow[:, np.newaxis]), Ps))
+                    
+                    # P = P - np.dot(Ps, k)
+
+                    # err = np.dot(self.Js, self.slow) - targ[:, itr]
+
+                    # self.Js = self.Js - np.dot(err[:, np.newaxis], k)
 
                 itr = itr + 1

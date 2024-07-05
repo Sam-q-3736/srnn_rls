@@ -40,7 +40,7 @@ class SpikeTraining:
             spk_times.append(spk_t[spk_inds == idx])
         plt.eventplot(spk_times[inds])
 
-    def plot_connectivity_matrix(self): 
-        plt.imshow(self.W_trained, cmap=plt.get_cmap('seismic'), vmin = -(max(-1*np.min(self.W_trained), np.max(self.W_trained))), vmax = (max(-1*np.min(self.W_trained), np.max(self.W_trained))))
+    def plot_connectivity_matrix(mat): 
+        plt.imshow(mat, cmap=plt.get_cmap('seismic'), vmin = -(max(-1*np.min(mat), np.max(mat))), vmax = (max(-1*np.min(mat), np.max(mat))))
         plt.title("Connectivity matrix after training")
         plt.colorbar()
