@@ -8,8 +8,8 @@ def create_default_params_LIF():
             'net_size': 300, # units in network
             'tau_s': 100, # ms, slow decay constant
             'tau_f': 2, # ms, fast decay constant
-            'tau_m': 10, # ms, membrane decay constant
-            'gain': 1.2, # multiplier
+            'tau_m': 20, # ms, membrane decay constant
+            'gain': 7, # mV, multiplier of synaptic drive
             'bias': 10, # mV, bias current
             'v_thr': -55, # mV, threshold
             'v_rest': -65, # mV, resting voltage
