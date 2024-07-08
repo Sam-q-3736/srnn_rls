@@ -21,8 +21,8 @@ def create_default_params_LIF():
             'lam': 5, # learning rate factor
             'training_loops': 10, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
-            'm': -57/300, # mean
-            'std': (17 ** 2)/np.sqrt(300), # standard deviation, 1/sqrt(netsize)
+            'm': -57, # mean
+            'std': (17), # standard deviation scalar, 1/sqrt(netsize)
             'cp': 1, # connection probability
             'runtime': 2000 # ms, runtime of trained network
         }
@@ -60,7 +60,7 @@ class LIFTraining(SpikeTraining):
         self.V = np.zeros(self.N) + self.v_rest # membrane voltages
 
         # fast and slow connectivity 
-        self.Jf = self.genw_sparse(p['net_size'], p['m'], p['std'], p['cp'])
+        self.Jf = self.genw_sparse(p['net_size'], p['m']/p['net_size'], p['std']/np.sqrt(p['net_size']), p['cp'])
         self.Js = np.zeros((self.N, self.N))
 
     def dslow(self): 
@@ -78,8 +78,8 @@ class LIFTraining(SpikeTraining):
     def step(self, stim, itr): 
         ext = stim[:, itr]
         # decay previous potentials
-        ds = self.dt * self.dslow()
-        df = self.dt * self.dfast()
+        ds = - self.dt/self.tau_s * self.slow
+        df = - self.dt/self.tau_f * self.fast
 
         self.slow += ds
         self.fast += df
