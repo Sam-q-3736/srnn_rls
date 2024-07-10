@@ -62,6 +62,9 @@ class LIFTraining(SpikeTraining):
         # fast and slow connectivity 
         self.Jf = self.genw_sparse(p['net_size'], p['m']/p['net_size'], p['std']/np.sqrt(p['net_size']), p['cp'])
         self.Js = np.zeros((self.N, self.N))
+        
+        # output weighting
+        self.W_out = np.zeros(self.N)
 
     def dslow(self): 
         return -1/self.tau_s * self.slow
@@ -124,7 +127,7 @@ class LIFTraining(SpikeTraining):
 
         return np.transpose(voltage), np.transpose(slow_curr), np.transpose(fast_curr)
 
-    def train_LIF(self, stim, targ): # trains slow synaptic drive to match stim
+    def train_LIF(self, stim, targ, fout): # trains slow synaptic drive to match stim
 
         # initialize correlation matrix
         P = np.eye(self.N, self.N) / self.lam
@@ -145,18 +148,9 @@ class LIFTraining(SpikeTraining):
                     P = P - np.outer(Ps, k)
 
                     err = np.dot(self.Js, self.slow) - targ[:, itr]
+                    oerr = np.dot(self.W_out, self.slow) - fout[itr] 
 
                     self.Js = self.Js - np.outer(err, k)
-
-                    # Ps = np.dot(P, self.slow)[:, np.newaxis]
-
-                    # k = np.transpose(Ps) \
-                    #     / (1 + np.dot(np.transpose(self.slow[:, np.newaxis]), Ps))
-                    
-                    # P = P - np.dot(Ps, k)
-
-                    # err = np.dot(self.Js, self.slow) - targ[:, itr]
-
-                    # self.Js = self.Js - np.dot(err[:, np.newaxis], k)
+                    self.W_out = self.W_out - oerr * k
 
                 itr = itr + 1
