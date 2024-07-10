@@ -4,62 +4,54 @@ import matplotlib.pyplot as plt
 from SpikeTraining import SpikeTraining
 
 def create_default_params_LIF():
-    neuron_params = {
+    p = {
             'net_size': 300, # units in network
             'tau_s': 100, # ms, slow decay constant
             'tau_f': 2, # ms, fast decay constant
-            'tau_m': 10, # ms, membrane decay constant
-            'gain': 1.2, # multiplier
+            'tau_m': 20, # ms, membrane decay constant
+            'gain': 7, # mV, multiplier of synaptic drive
             'bias': 10, # mV, bias current
             'v_thr': -55, # mV, threshold
             'v_rest': -65, # mV, resting voltage
-            't_refract': 2 # ms, refractory period 
-        }
-    time_params = {
+            't_refract': 2, # ms, refractory period 
             'total_time': 1000, # ms, total runtime
-            'dt': 0.1, # ms
+            'dt': 1, # ms
             'stim_on': 0, # ms
-            'stim_off': 50 # ms, matches run-forward time in FF_Demo
-        }    
-    train_params = {
-            'lam': 1, # learning rate factor
+            'stim_off': 50, # ms, matches run-forward time in FF_Demo
+            'lam': 5, # learning rate factor
             'training_loops': 10, # number of training loops
-            'train_every': 2 # ms, timestep of updating connectivity matrix
-        }
-    connectivity_params = {
-            'm': -57/neuron_params['net_size'], # mean
-            'std': (17 ** 2)/np.sqrt(neuron_params['net_size']), # standard deviation, 1/sqrt(netsize)
+            'train_every': 2, # ms, timestep of updating connectivity matrix
+            'm': -57, # mean
+            'std': (17), # standard deviation scalar, 1/sqrt(netsize)
             'cp': 1, # connection probability
-        }
-    run_params = {
             'runtime': 2000 # ms, runtime of trained network
         }
-    return neuron_params, time_params, train_params, connectivity_params, run_params
+    return p
 
 class LIFTraining(SpikeTraining): 
-    def __init__(self, neuron_params, time_params, train_params, connectivity_params, run_params):
+    def __init__(self, p):
         # unpack parameters
-        self.N = neuron_params['net_size']
-        self.tau_s = neuron_params['tau_s']
-        self.tau_f = neuron_params['tau_f']
-        self.tau_m = neuron_params['tau_m']
-        self.gain = neuron_params['gain']
-        self.bias = neuron_params['bias']
-        self.v_thr = neuron_params['v_thr']
-        self.v_rest = neuron_params['v_rest']
-        self.t_refract = neuron_params['t_refract']
+        self.N = p['net_size']
+        self.tau_s = p['tau_s']
+        self.tau_f = p['tau_f']
+        self.tau_m = p['tau_m']
+        self.gain = p['gain']
+        self.bias = p['bias']
+        self.v_thr = p['v_thr']
+        self.v_rest = p['v_rest']
+        self.t_refract = p['t_refract']
 
-        self.T = time_params['total_time']
-        self.dt = time_params['dt']
+        self.T = p['total_time']
+        self.dt = p['dt']
 
-        self.stim_on = time_params['stim_on']
-        self.stim_off = time_params['stim_off']
+        self.stim_on = p['stim_on']
+        self.stim_off = p['stim_off']
         
-        self.lam = train_params['lam']
-        self.nloop = train_params['training_loops']
-        self.train_every = train_params['train_every']
+        self.lam = p['lam']
+        self.nloop = p['training_loops']
+        self.train_every = p['train_every']
 
-        self.run_time = run_params['runtime']
+        self.run_time = p['runtime']
 
         # initialize variables 
         self.slow = np.zeros(self.N)
@@ -68,8 +60,11 @@ class LIFTraining(SpikeTraining):
         self.V = np.zeros(self.N) + self.v_rest # membrane voltages
 
         # fast and slow connectivity 
-        self.Jf = self.genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
+        self.Jf = self.genw_sparse(p['net_size'], p['m']/p['net_size'], p['std']/np.sqrt(p['net_size']), p['cp'])
         self.Js = np.zeros((self.N, self.N))
+        
+        # output weighting
+        self.W_out = np.zeros(self.N)
 
     def dslow(self): 
         return -1/self.tau_s * self.slow
@@ -86,8 +81,8 @@ class LIFTraining(SpikeTraining):
     def step(self, stim, itr): 
         ext = stim[:, itr]
         # decay previous potentials
-        ds = self.dt * self.dslow()
-        df = self.dt * self.dfast()
+        ds = - self.dt/self.tau_s * self.slow
+        df = - self.dt/self.tau_f * self.fast
 
         self.slow += ds
         self.fast += df
@@ -107,11 +102,11 @@ class LIFTraining(SpikeTraining):
 
     def run_LIF(self, stim): 
         
-        # initialize variables to base states
-        self.slow = np.zeros(self.N)
-        self.fast = np.zeros(self.N)
-        self.refract = np.zeros(self.N)
-        self.V = np.zeros(self.N) + self.v_rest
+        # # initialize variables to base states
+        # self.slow = np.zeros(self.N)
+        # self.fast = np.zeros(self.N)
+        # self.refract = np.zeros(self.N)
+        # self.V = np.zeros(self.N) + self.v_rest
 
         itr = 0
         timesteps = int(self.run_time / self.dt)
@@ -132,3 +127,30 @@ class LIFTraining(SpikeTraining):
 
         return np.transpose(voltage), np.transpose(slow_curr), np.transpose(fast_curr)
 
+    def train_LIF(self, stim, targ, fout): # trains slow synaptic drive to match stim
+
+        # initialize correlation matrix
+        P = np.eye(self.N, self.N) / self.lam
+        timesteps = int(self.T/self.dt)
+
+        for i in range(self.nloop):
+            if i % 20 == 0:
+                print('training:', i)
+            itr = 0
+            while itr < timesteps:
+
+                self.step(stim, itr)
+                if np.random.rand() < 1/(self.train_every * self.dt):
+                    # train matrix
+                    Ps = np.dot(P, self.slow)
+
+                    k = Ps / (1 + np.dot(self.slow, Ps))
+                    P = P - np.outer(Ps, k)
+
+                    err = np.dot(self.Js, self.slow) - targ[:, itr]
+                    oerr = np.dot(self.W_out, self.slow) - fout[itr] 
+
+                    self.Js = self.Js - np.outer(err, k)
+                    self.W_out = self.W_out - oerr * k
+
+                itr = itr + 1
