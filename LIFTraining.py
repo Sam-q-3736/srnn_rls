@@ -17,7 +17,7 @@ def create_default_params_LIF():
             'total_time': 1000, # ms, total runtime
             'dt': 1, # ms
             'stim_on': 0, # ms
-            'stim_off': 50, # ms, matches run-forward time in FF_Demo
+            'stim_off': 0, # ms, matches run-forward time in FF_Demo
             'lam': 5, # learning rate factor
             'training_loops': 10, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
