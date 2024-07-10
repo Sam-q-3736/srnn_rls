@@ -5,55 +5,47 @@ import seaborn as sns
 from SpikeTraining import SpikeTraining
 
 def create_default_params_rate():
-    neuron_params = {
+    p = {
             'net_size': 300, # units in network
             'tau_x': 10, # ms, decay constant
             'gain': 1, # multiplier
-        }
-    time_params = {
             'total_time': 2000, # ms, total runtime
             'dt': 1, # ms
             'stim_on': 0, # ms
-            'stim_off': 0 # ms, matches run-forward time in FF_Demo
-        }    
-    train_params = {
+            'stim_off': 0, # ms, matches run-forward time in FF_Demo
             'lam': 1, # learning rate factor
             'training_loops': 20, # number of training loops
-            'train_every': 2 # ms, timestep of updating connectivity matrix
-        }
-    connectivity_params = {
+            'train_every': 2, # ms, timestep of updating connectivity matrix
             'm': 0, # mean
-            'std': 1/np.sqrt(neuron_params['net_size']), # standard deviation, 1/sqrt(netsize)
+            'std': 1/np.sqrt(300), # standard deviation, 1/sqrt(netsize)
             'cp': 1, # connection probability
-        }
-    run_params = {
             'runtime': 2000 # ms, runtime of trained network
         }
-    return neuron_params, time_params, train_params, connectivity_params, run_params
+    return p
 
 class RateTraining(SpikeTraining): 
-    def __init__(self, neuron_params, time_params, train_params, connectivity_params, run_params):
+    def __init__(self, p):
         # initialize connectivity matrix
-        self.W_init = self.genw_sparse(neuron_params['net_size'], connectivity_params['m'], connectivity_params['std'], connectivity_params['cp'])
+        self.W_init = self.genw_sparse(p['net_size'], p['m'], p['std'], p['cp'])
         self.W_trained = np.copy(self.W_init)
         # initalize output weights
-        self.W_out = np.zeros(neuron_params['net_size'])
+        self.W_out = np.zeros(p['net_size'])
 
         # unpack parameters
-        self.N = neuron_params['net_size']
-        self.tau_x = neuron_params['tau_x']
-        self.gain = neuron_params['gain']
+        self.N = p['net_size']
+        self.tau_x = p['tau_x']
+        self.gain = p['gain']
 
-        self.T = time_params['total_time']
-        self.dt = time_params['dt']
-        self.stim_on = time_params['stim_on']
-        self.stim_off = time_params['stim_off']
+        self.T = p['total_time']
+        self.dt = p['dt']
+        self.stim_on = p['stim_on']
+        self.stim_off = p['stim_off']
 
-        self.lam = train_params['lam']
-        self.nloop = train_params['training_loops']
-        self.train_every = train_params['train_every']
+        self.lam = p['lam']
+        self.nloop = p['training_loops']
+        self.train_every = p['train_every']
 
-        self.run_time = run_params['runtime']
+        self.run_time = p['runtime']
 
         # track current activity
         self.x = np.zeros(self.N)
