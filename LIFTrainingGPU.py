@@ -1,7 +1,9 @@
 import numpy as np
 import scipy as sp
+import cupy as cp
 import matplotlib.pyplot as plt
 from SpikeTraining import SpikeTraining
+from LIFTraining import LIFTraining
 
 def create_default_params_LIF():
     p = {
@@ -28,7 +30,7 @@ def create_default_params_LIF():
         }
     return p
 
-class LIFTraining(SpikeTraining): 
+class LIFTrainingGPU(LIFTraining): 
     def __init__(self, p):
         # unpack parameters
         self.N = p['net_size']
@@ -66,20 +68,48 @@ class LIFTraining(SpikeTraining):
         # output weighting
         self.W_out = np.zeros(self.N)
 
-    def dslow(self): 
-        return -1/self.tau_s * self.slow
+    def toGPU(self):
+        # self.N = cp.asarray(self.N)
+        # self.tau_s = cp.asarray(self.tau_s)
+        # self.tau_f = cp.asarray(self.tau_f)
+        # self.gain = cp.asarray(self.gain)
+        # self.bias = cp.asarray(self.bias)
+        # self.v_thr = cp.asarray(self.v_thr)
+        # self.v_rest = cp.asarray(self.v_rest)
+        # self.t_refract = cp.asarray(self.t_refract)
 
-    def dfast(self):
-        return -1/self.tau_f * self.fast
+        self.slow = cp.asarray(self.slow)
+        self.fast = cp.asarray(self.fast)
+        self.refract = cp.asarray(self.refract) # time since last refractory period
+        self.V = cp.asarray(self.V) # membrane voltages
+
+        self.Jf = cp.asarray(self.Jf)
+        self.Js = cp.asarray(self.Js)
+
+        self.W_out = cp.asarray(self.W_out)
+
+    def toCPU(self):
+        # self.N = cp.asnumpy(self.N)
+        # self.tau_s = cp.asnumpy(self.tau_s)
+        # self.tau_f = cp.asnumpy(self.tau_f)
+        # self.gain = cp.asnumpy(self.gain)
+        # self.bias = cp.asnumpy(self.bias)
+        # self.v_thr = cp.asnumpy(self.v_thr)
+        # self.v_rest = cp.asnumpy(self.v_rest)
+        # self.t_refract = cp.asnumpy(self.t_refract)
+
+        self.slow = cp.asnumpy(self.slow)
+        self.fast = cp.asnumpy(self.fast)
+        self.refract = cp.asnumpy(self.refract) # time since last refractory period
+        self.V = cp.asnumpy(self.V) # membrane voltages
+
+        self.Jf = cp.asnumpy(self.Jf)
+        self.Js = cp.asnumpy(self.Js)
+
+        self.W_out = cp.asnumpy(self.W_out)
     
-    def dV(self, ext):
-        return 1/self.tau_m * (self.v_rest - self.V
-            + self.gain * (self.Js @ self.slow 
-                           + self.Jf @ self.fast + ext) 
-            + self.bias)
-    
-    def step(self, stim, itr): 
-        ext = stim[:, itr]
+    def stepGPU(self, stim, itr): 
+        ext = stim[:, itr] # can add check for in range
         # decay previous potentials
         ds = - self.dt/self.tau_s * self.slow
         df = - self.dt/self.tau_f * self.fast
@@ -89,8 +119,8 @@ class LIFTraining(SpikeTraining):
 
         # change in membrane potential
         dV = self.dt/self.tau_m * (self.v_rest - self.V
-            + self.gain * (self.Js @ self.slow 
-                           + self.Jf @ self.fast + ext) 
+            + self.gain * (cp.dot(self.Js, self.slow) 
+                           + cp.dot(self.Jf, self.fast) + ext) 
             + self.bias)
         
         self.V += dV
@@ -131,10 +161,16 @@ class LIFTraining(SpikeTraining):
 
         return np.transpose(voltage), np.transpose(slow_curr), np.transpose(fast_curr)
 
-    def train_LIF(self, stim, targ, fout): # trains slow synaptic drive to match stim
+    def trainGPU_LIF(self, stim, targ, fout): # trains slow synaptic drive to match stim
+
+        stimGPU = cp.asarray(stim)
+        targGPU = cp.asarray(targ)
+        foutGPU = cp.asarray(fout)
+
+        self.toGPU() # move to GPU
 
         # initialize correlation matrix
-        P = np.eye(self.N, self.N) / self.lam
+        P = cp.eye(self.N, self.N) / self.lam
         timesteps = int(self.T/self.dt)
 
         for i in range(self.nloop):
@@ -143,18 +179,20 @@ class LIFTraining(SpikeTraining):
             itr = 0
             while itr < timesteps:
 
-                self.step(stim, itr)
+                self.stepGPU(stimGPU, itr)
                 if np.random.rand() < 1/(self.train_every * self.dt):
                     # train matrix
-                    Ps = np.dot(P, self.slow)
+                    Ps = cp.dot(P, self.slow)
 
-                    k = Ps / (1 + np.dot(self.slow, Ps))
-                    P = P - np.outer(Ps, k)
+                    k = Ps / (1 + cp.dot(self.slow, Ps))
+                    P = P - cp.outer(Ps, k)
 
-                    err = np.dot(self.Js, self.slow) - targ[:, itr]
-                    oerr = np.dot(self.W_out, self.slow) - fout[itr] 
+                    err = cp.dot(self.Js, self.slow) - targGPU[:, itr]
+                    oerr = cp.dot(self.W_out, self.slow) - foutGPU[itr] 
 
-                    self.Js = self.Js - np.outer(err, k)
+                    self.Js = self.Js - cp.outer(err, k)
                     self.W_out = self.W_out - oerr * k
 
                 itr = itr + 1
+
+        self.toCPU() # move to CPU
