@@ -174,8 +174,9 @@ class LIFTrainingGPU(LIFTraining):
         timesteps = int(self.T/self.dt)
 
         for i in range(self.nloop):
-            if i % 20 == 0:
+            if i % int(self.nloop/5) == 0:
                 print('training:', i)
+                
             itr = 0
             while itr < timesteps:
 
