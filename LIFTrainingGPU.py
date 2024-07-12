@@ -8,6 +8,7 @@ from LIFTraining import LIFTraining
 def create_default_params_LIF():
     p = {
             'net_size': 300, # units in network
+            'num_out': 1, # number of total outputs
             'tau_s': 100, # ms, slow decay constant
             'tau_f': 2, # ms, fast decay constant
             'tau_m': 20, # ms, membrane decay constant
@@ -34,6 +35,7 @@ class LIFTrainingGPU(LIFTraining):
     def __init__(self, p):
         # unpack parameters
         self.N = p['net_size']
+        self.num_outs = p['num_out']
         self.tau_s = p['tau_s']
         self.tau_f = p['tau_f']
         self.tau_m = p['tau_m']
@@ -66,7 +68,7 @@ class LIFTrainingGPU(LIFTraining):
         self.Js = np.zeros((self.N, self.N))
         
         # output weighting
-        self.W_out = np.zeros(self.N)
+        self.W_out = np.zeros((self.num_outs, self.N))
 
     def toGPU(self):
         # self.N = cp.asarray(self.N)
@@ -189,10 +191,10 @@ class LIFTrainingGPU(LIFTraining):
                     P = P - cp.outer(Ps, k)
 
                     err = cp.dot(self.Js, self.slow) - targGPU[:, itr]
-                    oerr = cp.dot(self.W_out, self.slow) - foutGPU[itr] 
+                    oerr = cp.dot(self.W_out, self.slow) - foutGPU[:, itr] 
 
                     self.Js = self.Js - cp.outer(err, k)
-                    self.W_out = self.W_out - oerr * k
+                    self.W_out = self.W_out - cp.outer(oerr, k)
 
                 itr = itr + 1
 
