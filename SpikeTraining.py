@@ -8,18 +8,18 @@ class SpikeTraining:
     def create_default_params():
         raise NotImplementedError
 
-    def __init__(self):
-        raise NotImplementedError
+    def __init__(self, pars):
+        pass
 
     def genw_sparse(self, N, m, std, p):
         weight = sp.stats.norm.rvs(m, std, (N, N))
         is_zero = np.random.choice([0, 1], (N, N), [1-p, p])    
         return np.multiply(weight, is_zero)
 
-    def train_network(self, neuron_params, time_params, train_params, W, stim, targets):
+    def train(self, stim, targets, fout):
         raise NotImplementedError
 
-    def run_network(self, neuron_params, time_params, W, stim, run_time):
+    def run(self, stim):
         raise NotImplementedError
     
     def gen_rand_stim(self, pars):
@@ -33,14 +33,14 @@ class SpikeTraining:
             stim[row, int(pars['stim_on']/dt):int(pars['stim_off']/dt)] = rstim
         return stim
 
-    def plot_spk_rasts(spk_rast, inds):
+    def plot_spk_rasts(self, spk_rast, inds):
         spk_inds, spk_t = np.nonzero(spk_rast)
         spk_times = []
         for idx in np.unique(spk_inds):
             spk_times.append(spk_t[spk_inds == idx])
         plt.eventplot(spk_times[inds])
 
-    def plot_connectivity_matrix(mat): 
+    def plot_connectivity_matrix(self, mat): 
         plt.imshow(mat, cmap=plt.get_cmap('seismic'), vmin = -(max(-1*np.min(mat), np.max(mat))), vmax = (max(-1*np.min(mat), np.max(mat))))
         plt.title("Connectivity matrix after training")
         plt.colorbar()

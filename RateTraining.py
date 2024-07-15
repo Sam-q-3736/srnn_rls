@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import cupy as cp
 import matplotlib.pyplot as plt
 import seaborn as sns
 from SpikeTraining import SpikeTraining
@@ -7,6 +8,7 @@ from SpikeTraining import SpikeTraining
 def create_default_params_rate():
     p = {
             'net_size': 300, # units in network
+            'num_out': 1, # number of outputs
             'tau_x': 10, # ms, decay constant
             'gain': 1, # multiplier
             'total_time': 2000, # ms, total runtime
@@ -17,7 +19,7 @@ def create_default_params_rate():
             'training_loops': 20, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
             'm': 0, # mean
-            'std': 1/np.sqrt(300), # standard deviation, 1/sqrt(netsize)
+            'std': 1, # standard deviation multiplier, 1/sqrt(netsize)
             'cp': 1, # connection probability
             'runtime': 2000 # ms, runtime of trained network
         }
@@ -25,14 +27,9 @@ def create_default_params_rate():
 
 class RateTraining(SpikeTraining): 
     def __init__(self, p):
-        # initialize connectivity matrix
-        self.W_init = self.genw_sparse(p['net_size'], p['m'], p['std'], p['cp'])
-        self.W_trained = np.copy(self.W_init)
-        # initalize output weights
-        self.W_out = np.zeros(p['net_size'])
-
         # unpack parameters
         self.N = p['net_size']
+        self.num_outs = p['num_out']
         self.tau_x = p['tau_x']
         self.gain = p['gain']
 
@@ -47,16 +44,32 @@ class RateTraining(SpikeTraining):
 
         self.run_time = p['runtime']
 
+        # initialize connectivity matrix
+        self.W_trained = self.genw_sparse(self.N, p['m'], p['std']/np.sqrt(self.N), p['cp'])
+
+        # initalize output weights
+        self.W_out = np.zeros((self.num_outs, p['net_size']))
+
         # track current activity
         self.x = np.zeros(self.N)
         self.Hx = np.tanh(self.x)
 
-    # differential equation of dx/dt
-    def dx(self, x, ext):
-        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
-        # return 1/self.tau_x * (-x + self.gain * np.dot(np.tanh(x), self.W_trained) + ext)
+    def toGPU(self):
+        self.W_trained = cp.asarray(self.W_trained)
+        self.W_out = cp.asarray(self.W_out)
+        self.x = cp.asarray(self.x)
+        self.Hx = cp.asarray(self.Hx)
 
-    def rk4_step(self, stim, itr):
+    def toCPU(self):
+        self.W_trained = cp.asnumpy(self.W_trained)
+        self.W_out = cp.asnumpy(self.W_out)
+        self.x = cp.asnumpy(self.x)
+        self.Hx = cp.asnumpy(self.Hx)
+
+    def dx(self, x, ext): # deprecated
+        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
+
+    def rk4_step(self, stim, itr): # deprecated
         ext = stim[:, itr]
 
         x1 = self.dt * self.dx(self.x, ext)
@@ -67,109 +80,138 @@ class RateTraining(SpikeTraining):
         self.x = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
         self.Hx = np.tanh(self.x)
 
-    def step(self, stim, itr):
+    def step(self, stim: np.ndarray, itr: int):
         ext = stim[:, itr]
-
-        self.x = self.x + self.dt * self.dx(self.x, ext)
+        self.x = self.x + self.dt/self.tau_x * (-self.x + self.gain * np.dot(self.W_trained, np.tanh(self.x)) + ext)
         self.Hx = np.tanh(self.x)
 
-    def train_rate(self, stim, targets):
-        # initialize network activity to uniform random behavior
-        # can be excluded to run from previous state
-        # self.x = np.zeros(self.N)
-        self.x = sp.stats.uniform.rvs(size = self.N) * 2 - 1
-        self.Hx = np.tanh(self.x)
+    def stepGPU(self, stim: cp.ndarray, itr: int):
+        ext = stim[:, itr]
+        self.x = self.x + self.dt * 1/self.tau_x * (-self.x + self.gain * cp.dot(self.W_trained, cp.tanh(self.x)) + ext)
+        self.Hx = cp.tanh(self.x)
 
-        # initialize correlation matrix
-        P = np.eye(self.N) * 1/self.lam
-
-        # track variables
-        x_vals = []
-        Hx_vals = []
-        errs = []
-        rel_errs = []
-
-        t = 0
+    def run(self, stim: np.ndarray): 
         itr = 0
         timesteps = int(self.T/self.dt)
 
-        # training loop
-        for i in range(self.nloop):
-            if np.mod(i, 25) == 0:
-                print('training trial', i)
-            t = 0
-            itr = 0
-            
-            while itr < timesteps: 
-                
-                # calculate next step of diffeqs
-                self.rk4_step(stim, itr)
-
-                # track variables
-                x_vals.append(self.x)
-                Hx_vals.append(self.Hx)
-
-                # train connectivity matrix
-                if itr > int(self.stim_off/self.dt) and itr < timesteps \
-                    and np.random.rand() < 1/(self.train_every * self.dt):
-                    # and np.mod(itr, int(self.train_every/self.dt)) == 0:
-
-                    Phx = np.dot(P, self.Hx)
-
-                    # update correlation matrix
-                    numer = np.outer(Phx, Phx)
-                    denom = 1 + np.dot(np.transpose(self.Hx), Phx)
-                    P = P - numer / denom
-                    # k = np.transpose(np.dot(P, self.Hx)) / denom
-                    
-                    # update error
-                    err = np.dot(self.W_trained, self.Hx) - targets[:, itr] # error is vector
-                    errs.append(np.linalg.norm(err))
-
-                    # update connectivity
-                    self.W_trained = self.W_trained - np.outer(err, np.dot(P, self.Hx))
-
-                    #dws.append(np.linalg.norm(np.outer(err, np.dot(P, self.Hx))))
-                    rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - targets[:, itr]) / err))
-                
-                # update timestep
-                t = t + self.dt
-                itr = itr + 1
-
-        x_vals = np.transpose(x_vals)
-        Hx_vals = np.transpose(Hx_vals)
-        return x_vals, Hx_vals, errs, rel_errs
-
-    def run_rate(self, stim): 
-
-        # initialize network activity to 0 
-        # can be excluded to run from previous state
-        # self.x = np.zeros(self.N)
-        # self.Hx = np.tanh(self.x)
-
         # track variables
-        x_vals = []
-        Hx_vals = []
+        x_vals = np.zeros((timesteps, self.N))
+        Hx_vals = np.zeros((timesteps, self.N))
 
-        #t = 0
-        itr = 0
-        timesteps = int(self.T/self.dt)
         while itr < timesteps:
-            # RK4 for each timestep
-            #self.rk4_step(stim, itr)
             self.step(stim, itr)
 
             # track variables
             x_vals.append(self.x)
             Hx_vals.append(self.Hx)
 
-            #t = t + self.dt
             itr = itr + 1
         
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
         return x_vals, Hx_vals
 
+    def runGPU(self, stim: np.ndarray): 
+        itr = 0
+        timesteps = int(self.T/self.dt)
+        
+        # track variables
+        x_vals = cp.zeros((timesteps, self.N))
+        Hx_vals = cp.zeros((timesteps, self.N))
+
+        # move variables to GPU
+        stimGPU = cp.asarray(stim)
+        self.toGPU()
+
+        while itr < timesteps:
+            self.stepGPU(stimGPU, itr)
+
+            # track variables
+            x_vals[itr, :] = self.x
+            Hx_vals[itr, :] = self.Hx
+
+            #t = t + self.dt
+            itr = itr + 1
+                
+        x_vals = np.transpose(x_vals)
+        Hx_vals = np.transpose(Hx_vals)
+
+        # move variables to CPU
+        self.toCPU()
+        x_vals = cp.asnumpy(x_vals)
+        Hx_vals = cp.asnumpy(Hx_vals)
+
+        return x_vals, Hx_vals
+
+    def train(self, stim: np.ndarray, targ: np.ndarray, fout: np.ndarray):
+        # initialize correlation matrix
+        P = np.eye(self.N) * 1/self.lam
+        timesteps = int(self.T/self.dt)
+
+        # training loop
+        for i in range(self.nloop):
+            itr = 0
+            
+            while itr < timesteps: 
+                
+                # calculate next step of diffeqs
+                self.step(stim, itr)
+
+                # train connectivity matrix
+                if itr < timesteps and np.random.rand() < 1/(self.train_every * self.dt):
+
+                    Phx = np.dot(P, self.Hx)
+                    k = Phx / (1 + np.dot(self.Hx, Phx))
+                    P = P - np.outer(Phx, k)
+                    
+                    # update error
+                    err = np.dot(self.W_trained, self.Hx) - targ[:, itr]
+                    oerr = np.dot(self.W_out, self.Hx) - fout[:, itr]
+
+                    # update connectivity
+                    self.W_trained = self.W_trained - np.outer(err, k)
+                    self.W_out = self.W_out - np.outer(oerr, k)
+                
+                itr = itr + 1
+
+    def trainGPU(self, stim: np.ndarray, targ: np.ndarray, fout: np.ndarray):
+        # initialize correlation matrix
+        P = cp.eye(self.N, self.N) / self.lam
+        timesteps = int(self.T/self.dt)
+
+        stimGPU = cp.asarray(stim)
+        targGPU = cp.asarray(targ)
+        foutGPU = cp.asarray(fout)
+        self.toGPU() # move to GPU
+
+        for i in range(self.nloop):
+            itr = 0
+            
+            while itr < timesteps: 
+                
+                # calculate next step of diffeqs
+                self.stepGPU(stimGPU, itr)
+
+                # train connectivity matrix
+                if itr < timesteps and np.random.rand() < 1/(self.train_every * self.dt):
+
+                    Phx = cp.dot(P, self.Hx)
+                    k = Phx / (1 + cp.dot(self.Hx, Phx))
+                    P = P - cp.outer(Phx, k)
+                    
+                    # update error
+                    err = cp.dot(self.W_trained, self.Hx) - targGPU[:, itr]
+                    oerr = cp.dot(self.W_out, self.Hx) - foutGPU[:, itr]
+
+                    # update connectivity
+                    self.W_trained = self.W_trained - cp.outer(err, k)
+                    self.W_out = self.W_out - cp.outer(oerr, k)
+                
+                itr = itr + 1
+        
+        self.toCPU() # move to CPU
+
+    # to be refactored
     def fullFORCE(self, fin, fout):
         npar, tpar, trpar, cpar, rpar = create_default_params_rate()
         rpar['runtime'] = self.T
