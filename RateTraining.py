@@ -66,20 +66,6 @@ class RateTraining(SpikeTraining):
         self.x = cp.asnumpy(self.x)
         self.Hx = cp.asnumpy(self.Hx)
 
-    def dx(self, x, ext): # deprecated
-        return 1/self.tau_x * (-x + self.gain * np.dot(self.W_trained, np.tanh(x)) + ext)
-
-    def rk4_step(self, stim, itr): # deprecated
-        ext = stim[:, itr]
-
-        x1 = self.dt * self.dx(self.x, ext)
-        x2 = self.dt * self.dx(self.x + x1/2, ext)
-        x3 = self.dt * self.dx(self.x + x2/2, ext)
-        x4 = self.dt * self.dx(self.x + x3, ext)
-
-        self.x = self.x + (x1 + 2*x2 + 2*x3 + x4) / 6
-        self.Hx = np.tanh(self.x)
-
     def step(self, stim: np.ndarray, itr: int):
         ext = stim[:, itr]
         self.x = self.x + self.dt/self.tau_x * (-self.x + self.gain * np.dot(self.W_trained, np.tanh(self.x)) + ext)
@@ -91,21 +77,19 @@ class RateTraining(SpikeTraining):
         self.Hx = cp.tanh(self.x)
 
     def run(self, stim: np.ndarray): 
-        itr = 0
         timesteps = int(self.T/self.dt)
 
         # track variables
         x_vals = np.zeros((timesteps, self.N))
         Hx_vals = np.zeros((timesteps, self.N))
 
-        while itr < timesteps:
+        for itr in range(timesteps):
+
             self.step(stim, itr)
 
             # track variables
             x_vals.append(self.x)
             Hx_vals.append(self.Hx)
-
-            itr = itr + 1
         
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
@@ -123,18 +107,15 @@ class RateTraining(SpikeTraining):
         stimGPU = cp.asarray(stim)
         self.toGPU()
 
-        while itr < timesteps:
+        for itr in range(timesteps):
             self.stepGPU(stimGPU, itr)
 
             # track variables
             x_vals[itr, :] = self.x
             Hx_vals[itr, :] = self.Hx
-
-            #t = t + self.dt
-            itr = itr + 1
                 
-        x_vals = np.transpose(x_vals)
-        Hx_vals = np.transpose(Hx_vals)
+        x_vals = cp.transpose(x_vals)
+        Hx_vals = cp.transpose(Hx_vals)
 
         # move variables to CPU
         self.toCPU()
@@ -150,9 +131,8 @@ class RateTraining(SpikeTraining):
 
         # training loop
         for i in range(self.nloop):
-            itr = 0
             
-            while itr < timesteps: 
+            for itr in range(timesteps):
                 
                 # calculate next step of diffeqs
                 self.step(stim, itr)
@@ -172,8 +152,6 @@ class RateTraining(SpikeTraining):
                     self.W_trained = self.W_trained - np.outer(err, k)
                     self.W_out = self.W_out - np.outer(oerr, k)
                 
-                itr = itr + 1
-
     def trainGPU(self, stim: np.ndarray, targ: np.ndarray, fout: np.ndarray):
         # initialize correlation matrix
         P = cp.eye(self.N, self.N) / self.lam
@@ -185,9 +163,8 @@ class RateTraining(SpikeTraining):
         self.toGPU() # move to GPU
 
         for i in range(self.nloop):
-            itr = 0
             
-            while itr < timesteps: 
+            for itr in range(timesteps):
                 
                 # calculate next step of diffeqs
                 self.stepGPU(stimGPU, itr)
@@ -206,9 +183,7 @@ class RateTraining(SpikeTraining):
                     # update connectivity
                     self.W_trained = self.W_trained - cp.outer(err, k)
                     self.W_out = self.W_out - cp.outer(oerr, k)
-                
-                itr = itr + 1
-        
+                        
         self.toCPU() # move to CPU
 
     # to be refactored
