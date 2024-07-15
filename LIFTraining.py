@@ -18,8 +18,6 @@ def create_default_params_LIF():
             't_refract': 2, # ms, refractory period 
             'total_time': 1000, # ms, total runtime
             'dt': 1, # ms
-            'stim_on': 0, # ms
-            'stim_off': 0, # ms, matches run-forward time in FF_Demo
             'lam': 5, # learning rate factor
             'training_loops': 10, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
@@ -47,9 +45,6 @@ class LIFTraining(SpikeTraining):
         self.T = p['total_time']
         self.dt = p['dt']
 
-        self.stim_on = p['stim_on']
-        self.stim_off = p['stim_off']
-        
         self.lam = p['lam']
         self.nloop = p['training_loops']
         self.train_every = p['train_every']

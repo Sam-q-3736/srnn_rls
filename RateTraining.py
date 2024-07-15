@@ -13,8 +13,6 @@ def create_default_params_rate():
             'gain': 1, # multiplier
             'total_time': 2000, # ms, total runtime
             'dt': 1, # ms
-            'stim_on': 0, # ms
-            'stim_off': 0, # ms, matches run-forward time in FF_Demo
             'lam': 1, # learning rate factor
             'training_loops': 20, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
@@ -35,8 +33,6 @@ class RateTraining(SpikeTraining):
 
         self.T = p['total_time']
         self.dt = p['dt']
-        self.stim_on = p['stim_on']
-        self.stim_off = p['stim_off']
 
         self.lam = p['lam']
         self.nloop = p['training_loops']
@@ -88,8 +84,8 @@ class RateTraining(SpikeTraining):
             self.step(stim, itr)
 
             # track variables
-            x_vals.append(self.x)
-            Hx_vals.append(self.Hx)
+            x_vals[itr, :] = (self.x)
+            Hx_vals[itr, :] = (self.Hx)
         
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
@@ -188,15 +184,15 @@ class RateTraining(SpikeTraining):
 
     # to be refactored
     def fullFORCE(self, fin, fout):
-        npar, tpar, trpar, cpar, rpar = create_default_params_rate()
-        rpar['runtime'] = self.T
-        DRNN = RateTraining(npar, tpar, trpar, cpar, rpar)
+        p = create_default_params_rate()
+        p['runtime'] = self.T
+        DRNN = RateTraining(p)
         Jd = DRNN.W_init
 
         # initialize random weighting inputs
-        uind = sp.stats.uniform.rvs(size = npar['net_size']) * 2 - 1
-        uin = sp.stats.uniform.rvs(size = npar['net_size']) * 2 - 1
-        uout = sp.stats.uniform.rvs(size = npar['net_size']) * 2 - 1
+        uind = sp.stats.uniform.rvs(size = p['net_size']) * 2 - 1
+        uin = sp.stats.uniform.rvs(size = p['net_size']) * 2 - 1
+        uout = sp.stats.uniform.rvs(size = p['net_size']) * 2 - 1
 
         # generate inputs
         ufind = np.transpose(np.multiply(fin, uind))
@@ -220,17 +216,11 @@ class RateTraining(SpikeTraining):
         aux_targs = []
 
         # begin training
-        itr = 0
-        #t = 0
         print(self.nloop, 'total trainings')
         for i in range(self.nloop):
-            if i % 20 == 0: print('training:', i)
-            # _, dHx = DRNN.run_rate(ufin + ufout)
-            # aux_targs = ufout + Jd @ dHx
+            #if i % 20 == 0: print('training:', i)
             
-            itr = 0
-            #t = 0
-            while itr < timesteps: 
+            for itr in range(timesteps): 
                 
                 # calculate next step of diffeqs
                 self.step(ufin, itr)
@@ -249,8 +239,6 @@ class RateTraining(SpikeTraining):
                     Phx = np.dot(P, self.Hx)
      
                     # update correlation matrix
-                    # numer = np.outer(Phx, Phx)
-                    # denom = 1 + np.dot(np.transpose(self.Hx), Phx)
                     k = Phx / (1 + np.dot(np.transpose(self.Hx), Phx))
                     P = P - np.outer(Phx, k)
                     
@@ -268,10 +256,6 @@ class RateTraining(SpikeTraining):
                     errs.append(np.linalg.norm(err))
                     rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targ) / err))
                 
-                # update timestep
-                # t = t + self.dt
-                itr = itr + 1
-
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
         aux_targs = np.transpose(aux_targs)
