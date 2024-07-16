@@ -187,33 +187,42 @@ class RateTraining(SpikeTraining):
         p = create_default_params_rate()
         p['runtime'] = self.T
         DRNN = RateTraining(p)
-        Jd = DRNN.W_init
+
+        np.random.seed(123456)
+        DRNN.W_trained = (np.random.rand(self.N, self.N) - 0.5) * 2 / np.sqrt(300)
+        Jd = DRNN.W_trained
+
+        self.W_trained = np.zeros((self.N, self.N))
 
         # initialize random weighting inputs
-        uind = sp.stats.uniform.rvs(size = p['net_size']) * 2 - 1
-        uin = sp.stats.uniform.rvs(size = p['net_size']) * 2 - 1
-        uout = sp.stats.uniform.rvs(size = p['net_size']) * 2 - 1
+        # np.random.seed(0)
+        uind = np.random.rand(3, p['net_size']) * 2 - 1
+
+        # np.random.seed(123456789)
+        uin = np.random.rand(1, p['net_size']) * 2 - 1
 
         # generate inputs
-        ufind = np.transpose(np.multiply(fin, uind))
-        ufin = np.transpose(np.multiply(fin, uin))
-        ufout = np.transpose(np.multiply(fout, uout))
+        ufind = np.transpose(uind[0] * fin)
+        ufout = np.transpose(uind[1] * fout)
+
+        ufin = np.transpose(uin * fin)
+        dinp = ufind + ufout
 
         print('Stabilizing networks')
         for i in range(3): # 3 used in full-FORCE
-            DRNN.run_rate(ufind + ufout)
-            self.run_rate(ufin)
+            DRNN.run(dinp)
+            self.run(ufin)
 
         # initialize variables
         timesteps = int(self.T/self.dt)
         P = np.eye(self.N) / self.lam
                 
         # tracking variables
-        x_vals = []
-        Hx_vals = []
+        x_vals = np.zeros((self.nloop * timesteps, self.N))
+        Hx_vals = np.zeros((self.nloop * timesteps, self.N))
         errs = []
         rel_errs = []
-        aux_targs = []
+        aux_targs = np.zeros((self.nloop * timesteps, self.N))
 
         # begin training
         print(self.nloop, 'total trainings')
@@ -224,17 +233,15 @@ class RateTraining(SpikeTraining):
                 
                 # calculate next step of diffeqs
                 self.step(ufin, itr)
-                DRNN.step(ufind + ufout, itr)
-                aux_targ = np.dot(Jd, DRNN.Hx) + ufout[:, itr]
+                DRNN.step(dinp, itr)
 
                 # track variables
-                x_vals.append(self.x)
-                Hx_vals.append(self.Hx)
-                aux_targs.append(aux_targ)
+                x_vals[itr + i * timesteps, :] = self.x
+                Hx_vals[itr + i * timesteps, :] = self.Hx
+                aux_targs[itr + i * timesteps, :] = np.dot(Jd, DRNN.Hx) + ufout[:, itr]
 
                 # train connectivity matrix
                 if np.random.rand() < 1/(self.train_every * self.dt):
-                    # and np.mod(itr, int(self.train_every/self.dt)) == 0:
 
                     Phx = np.dot(P, self.Hx)
      
@@ -243,7 +250,7 @@ class RateTraining(SpikeTraining):
                     P = P - np.outer(Phx, k)
                     
                     # update error
-                    err = np.dot(self.W_trained, self.Hx) - aux_targ # error is vector
+                    err = np.dot(self.W_trained, self.Hx) - aux_targs[itr + i * timesteps, :] # error is vector
                     oerr = np.dot(self.W_out, self.Hx) - fout[itr] # error is scalar
 
                     # update connectivity
@@ -254,7 +261,7 @@ class RateTraining(SpikeTraining):
                     
                     # track training errors
                     errs.append(np.linalg.norm(err))
-                    rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targ) / err))
+                    rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targs[itr + i * timesteps, :]) / err))
                 
         x_vals = np.transpose(x_vals)
         Hx_vals = np.transpose(Hx_vals)
