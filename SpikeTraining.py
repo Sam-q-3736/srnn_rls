@@ -22,15 +22,15 @@ class SpikeTraining:
     def run(self, stim):
         raise NotImplementedError
     
-    def gen_rand_stim(self, pars):
-        N = pars['net_size']
-        dt = pars['dt']
-        timesteps = int(pars['total_time']/dt)
+    def gen_rand_stim(self, on, off):
+        N = self.N
+        dt = self.dt
+        timesteps = int(self.T/dt)
         
         stim = np.zeros((N, timesteps))
         for row in range(N):
             rstim = 2 * sp.stats.uniform.rvs(0, 1) - 1 # random stim weight from -1, 1
-            stim[row, int(pars['stim_on']/dt):int(pars['stim_off']/dt)] = rstim
+            stim[row, int(on/dt):int(off/dt)] = rstim
         return stim
 
     def plot_spk_rasts(self, spk_rast, inds):
