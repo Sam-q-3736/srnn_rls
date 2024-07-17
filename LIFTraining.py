@@ -173,7 +173,7 @@ class LIFTraining(SpikeTraining):
         timesteps = int(self.run_time / self.dt)
 
         stimGPU = cp.asarray(stim)
-        self.toGPU
+        self.toGPU()
 
         # tracking variables
         voltage = cp.zeros((timesteps, self.N))
@@ -220,10 +220,10 @@ class LIFTraining(SpikeTraining):
                     P = P - np.outer(Ps, k)
 
                     err = np.dot(self.Js, self.slow) - targ[:, itr]
-                    oerr = np.dot(self.W_out, self.slow) - fout[itr] 
+                    oerr = np.dot(self.W_out, self.slow) - fout[:, itr] 
 
                     self.Js = self.Js - np.outer(err, k)
-                    self.W_out = self.W_out - oerr * k
+                    self.W_out = self.W_out - np.outer(oerr, k)
 
     def trainGPU(self, stim: np.ndarray, targ: np.ndarray, fout: np.ndarray): 
 
@@ -252,9 +252,9 @@ class LIFTraining(SpikeTraining):
                     P = P - cp.outer(Ps, k)
 
                     err = cp.dot(self.Js, self.slow) - targGPU[:, itr]
-                    oerr = cp.dot(self.W_out, self.slow) - foutGPU[itr] 
+                    oerr = cp.dot(self.W_out, self.slow) - foutGPU[:, itr] 
 
                     self.Js = self.Js - cp.outer(err, k)
-                    self.W_out = self.W_out - oerr * k
+                    self.W_out = self.W_out - cp.outer(oerr, k)
         
         self.toCPU()
