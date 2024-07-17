@@ -206,8 +206,6 @@ class LIFTraining(SpikeTraining):
         P = np.eye(self.N, self.N) / self.lam
 
         for i in range(self.nloop):
-            if i % 20 == 0:
-                print('training:', i)
 
             for itr in range(timesteps):
 
@@ -238,8 +236,6 @@ class LIFTraining(SpikeTraining):
         P = cp.eye(self.N, self.N) / self.lam
 
         for i in range(self.nloop):
-            if i % 20 == 0:
-                print('training:', i)
 
             for itr in range(timesteps):
 
