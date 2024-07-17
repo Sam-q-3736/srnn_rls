@@ -16,9 +16,10 @@ class TestLIFModel(unittest.TestCase):
         testnet = LIFTraining(p)
         stim = testnet.gen_rand_stim(0, 0)
         self.assertEqual(np.shape(stim)[1], int(testnet.T / testnet.dt))
-        x, Hx, voltage = testnet.run(stim)
+        voltage, x, Hx = testnet.run(stim)
         
         r = testnet.run_time - 1
 
         for i in range(testnet.N):
-            self.assertTrue(x[i, r] < 0)
+            self.assertEqual(np.floor(voltage[i, 0]), testnet.v_rest)
+            self.assertEqual(np.ceil(voltage[i, r]), testnet.v_thr)
