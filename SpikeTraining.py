@@ -25,7 +25,7 @@ class SpikeTraining:
     def gen_rand_stim(self, on, off):
         N = self.N
         dt = self.dt
-        timesteps = int(self.T/dt)
+        timesteps = int(self.run_time/dt)
         
         stim = np.zeros((N, timesteps))
         for row in range(N):

@@ -24,7 +24,7 @@ def create_default_params_LIF():
             'm': -57, # mean
             'std': (17), # standard deviation scalar, 1/sqrt(netsize)
             'cp': 1, # connection probability
-            'runtime': 2000 # ms, runtime of trained network
+            'runtime': 1000 # ms, runtime of trained network
         }
     return p
 
