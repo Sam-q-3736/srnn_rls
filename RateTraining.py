@@ -182,14 +182,112 @@ class RateTraining(SpikeTraining):
                         
         self.toCPU() # move to CPU
 
+    def ff(self, fin, fout): 
+        
+        # First, initialize some parameters
+        N = self.N
+        self.W_trained = np.zeros((N,N))
+        self.W_out = np.zeros((self.num_outs, N))
+  
+		# Then instantiate the network and pull out some relevant weights
+        p = create_default_params_rate()
+        DRNN = RateTraining(p)
+		
+        ufind = np.outer(sp.stats.uniform.rvs(size = self.N), fin)
+        ufout = np.outer(sp.stats.uniform.rvs(size = self.N), fout)
+
+        ufin = np.outer(sp.stats.uniform.rvs(size = self.N), fin)
+
+        # w_targ = np.transpose(DRNN.rnn_par['inp_weights'][D_num_inputs:(D_num_inputs+D_num_targs),:])
+		# w_hint = np.transpose(DRNN.rnn_par['inp_weights'][(D_num_inputs+D_num_targs):D_num_total_inps,:])
+        Jd = DRNN.W_trained
+
+		################### Monitor training with these variables:
+        J_err_ratio = []
+        J_err_mag = []
+        J_norm = []
+
+        w_err_ratio = []
+        w_err_mag = []
+        w_norm = []
+		###################
+
+		# Let the networks settle from the initial conditions
+        print('Initializing',end="")
+        for i in range(3):
+            print('.',end="")
+			# inp, targ, hints = inps_and_targs(dt=p['dt'], **kwargs)[0:3]
+			# D_total_inp = np.hstack((inp,targ,hints))
+            DRNN.run(ufind + ufout)
+            self.run(ufind)
+        print('')
+
+		# Now begin training
+        print('Training network...')
+		# Initialize the inverse correlation matrix
+        P = np.eye(N)/self.lam
+        for trial in range(self.nloop):
+            if np.mod(trial,50)==0:
+                print('')
+            print('.',end="")
+
+            # For recording:
+            # dx = [] # Driven network activity
+            # x = []	# RNN activity
+            # z = []	# RNN output
+            for itr in range(self.T):
+                # Run both RNNs forward and get the activity. Record activity for potential plotting
+                DRNN.step(ufind + ufout, itr)
+                self.step(ufin, itr)
+
+                # dx.append(np.squeeze(np.tanh(dx_t) + np.arange(5)*2))
+                # z.append(np.squeeze(z_t))
+                # x.append(np.squeeze(np.tanh(x_t[:,0:5]) + np.arange(5)*2))
+
+                if np.random.rand() < (1/self.train_every):
+                    # Extract relevant values
+                    r = self.Hx # column vector
+                    rd = DRNN.Hx # column vector
+                    J = self.W_trained
+                    w = self.W_out
+
+                    # Now for the RLS algorithm:
+                    # Compute errors
+                    J_err = (np.dot(J,r) - np.dot(Jd,rd) 
+                            - ufout[:, itr])
+
+                    w_err = np.dot(w,r) - fout[itr]
+
+                    # Compute the gain (k) and running estimate of the inverse correlation matrix
+                    Pr = np.dot(P,r)
+                    k = Pr / (1 + np.dot(self.Hx, Pr))
+                    P = P - np.outer(Pr, k)
+
+                    # Update weights
+                    w = w - np.outer(w_err, k)
+                    J = J - np.outer(J_err, k)
+
+                    self.W_trained = J
+                    self.W_out = w
+
+                    # if monitor_training==1:
+                    #     J_err_plus = (np.dot(J,r) - np.dot(Jd,rd) 
+                    #                 -np.dot(w_targ,targ[t:(t+1),:].T) - np.dot(w_hint, hints[t:(t+1),:].T))
+                    #     J_err_ratio = np.hstack((J_err_ratio, np.squeeze(np.mean(J_err_plus/J_err))))
+                    #     J_err_mag = np.hstack((J_err_mag, np.squeeze(np.linalg.norm(J_err))))
+                    #     J_norm = np.hstack((J_norm,np.squeeze(np.linalg.norm(J))))
+
+                    #     w_err_plus = np.dot(w,r) - targ[t:(t+1),:].T
+                    #     w_err_ratio = np.hstack((w_err_ratio, np.squeeze(w_err_plus/w_err)))
+                    #     w_err_mag = np.hstack((w_err_mag, np.squeeze(np.linalg.norm(w_err))))
+                    #     w_norm = np.hstack((w_norm, np.squeeze(np.linalg.norm(w))))
+        return ufin
+    
     # to be refactored
     def fullFORCE(self, fin, fout):
         p = create_default_params_rate()
         p['runtime'] = self.T
         DRNN = RateTraining(p)
-
-        np.random.seed(123456)
-        DRNN.W_trained = (np.random.rand(self.N, self.N) - 0.5) * 2 / np.sqrt(300)
         Jd = DRNN.W_trained
 
         self.W_trained = np.zeros((self.N, self.N))

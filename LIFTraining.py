@@ -93,11 +93,11 @@ class LIFTraining(SpikeTraining):
         ext = stim[:, itr]
 
         # decay previous potentials
-        dslow = - self.dt/self.tau_s * self.slow
-        dfast = - self.dt/self.tau_f * self.fast
+        dslow = np.multiply(self.slow, -self.dt/self.tau_s)
+        dfast = np.multiply(self.fast, -self.dt/self.tau_f)
 
-        self.slow += dslow
-        self.fast += dfast
+        self.slow = np.add(self.slow, dslow)
+        self.fast = np.add(self.fast, dfast)
 
         # change in membrane potential
         dV = self.dt/self.tau_m * (self.v_rest - self.V
@@ -122,11 +122,11 @@ class LIFTraining(SpikeTraining):
         ext = stim[:, itr]
 
         # decay previous potentials
-        dslow = - self.dt/self.tau_s * self.slow
-        dfast = - self.dt/self.tau_f * self.fast
+        dslow = cp.multiply(self.slow, -self.dt/self.tau_s)
+        dfast = cp.multiply(self.fast, -self.dt/self.tau_f)
 
-        self.slow += dslow
-        self.fast += dfast
+        self.slow = cp.add(self.slow, dslow)
+        self.fast = cp.add(self.fast, dfast)
 
         # change in membrane potential
         dV = self.dt/self.tau_m * (self.v_rest - self.V
@@ -254,3 +254,85 @@ class LIFTraining(SpikeTraining):
                     self.W_out = self.W_out - cp.outer(oerr, k)
         
         self.toCPU()
+
+    def depasquale(self, fin, fout):
+        from RateTraining import create_default_params_rate
+        from RateTraining import RateTraining
+
+        p = create_default_params_rate()
+        p['runtime'] = self.T
+        DRNN = RateTraining(p)
+        Jd = DRNN.W_trained
+
+        # initialize random weighting inputs
+        uind = np.random.rand(self.num_outs, self.N) * 2 - 1
+        uin = np.random.rand(1, self.N) * 2 - 1
+
+        # generate inputs
+        ufind = np.transpose(uind[0] * fin)
+        ufout = np.transpose(uind[1] * fout)
+
+        ufin = np.transpose(uin * fin)
+        dinp = ufind + ufout
+
+        print('Stabilizing networks')
+        for i in range(3): # 3 used in full-FORCE
+            DRNN.run(dinp)
+            self.run(ufin)
+
+        # initialize variables
+        timesteps = int(self.T/self.dt)
+        P = np.eye(self.N) / self.lam
+                
+        # tracking variables
+        voltage = np.zeros((self.nloop * timesteps, self.N))
+        slow = np.zeros((self.nloop * timesteps, self.N))
+        fast = np.zeros((self.nloop * timesteps, self.N))
+        # errs = []
+        # rel_errs = []
+        aux_targs = np.zeros((self.nloop * timesteps, self.N))
+
+        # begin training
+        print(self.nloop, 'total trainings')
+        for i in range(self.nloop):
+            #if i % 20 == 0: print('training:', i)
+            
+            for itr in range(timesteps): 
+                
+                # calculate next step of diffeqs
+                self.step(ufin, itr)
+                DRNN.step(dinp, itr)
+
+                # track variables
+                voltage[itr + i * timesteps, :] = self.V
+                slow[itr + i * timesteps, :] = self.slow
+                fast[itr + i * timesteps, :] = self.fast
+                aux_targs[itr + i * timesteps, :] = np.dot(Jd, DRNN.Hx) + ufout[:, itr]
+
+                # train connectivity matrix
+                if np.random.rand() < 1/(self.train_every * self.dt):
+
+                    Phx = np.dot(P, self.slow)
+     
+                    # update correlation matrix
+                    k = Phx / (1 + np.dot(np.transpose(self.slow), Phx))
+                    P = P - np.outer(Phx, k)
+                    
+                    # update error
+                    err = np.dot(self.Js, self.slow) - aux_targs[itr + i * timesteps, :] # error is vector
+                    oerr = np.dot(self.W_out, self.slow) - fout[itr, :] # error is scalar
+
+                    # update connectivity
+                    self.Js = self.Js - np.outer(err, k)
+
+                    # update output weights
+                    self.W_out = self.W_out - np.outer(oerr, k)
+                    
+                    # track training errors
+                    # errs.append(np.linalg.norm(err))
+                    # rel_errs.append(np.mean((np.dot(self.W_trained, self.Hx) - aux_targs[itr + i * timesteps, :]) / err))
+                
+        slow = np.transpose(slow)
+        fast = np.transpose(fast)
+        aux_targs = np.transpose(aux_targs)
+        return voltage, slow, fast, aux_targs, ufin, ufout
