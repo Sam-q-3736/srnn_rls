@@ -22,7 +22,7 @@ def create_default_params_LIF():
             'training_loops': 10, # number of training loops
             'train_every': 2, # ms, timestep of updating connectivity matrix
             'm': -57, # mean
-            'std': (17), # standard deviation scalar, 1/sqrt(netsize)
+            'std': 1, # standard deviation scalar, 1/sqrt(netsize)
             'cp': 1, # connection probability
             'runtime': 1000 # ms, runtime of trained network
         }
@@ -236,6 +236,48 @@ class LIFTraining(SpikeTraining):
         P = cp.eye(self.N, self.N) / self.lam
 
         for i in range(self.nloop):
+
+            for itr in range(timesteps):
+
+                self.stepGPU(stimGPU, itr)
+                if np.random.rand() < 1/(self.train_every * self.dt):
+
+                    Ps = cp.dot(P, self.slow)
+
+                    k = Ps / (1 + cp.dot(self.slow, Ps))
+                    P = P - cp.outer(Ps, k)
+
+                    err = cp.dot(self.Js, self.slow) - targGPU[:, itr]
+                    oerr = cp.dot(self.W_out, self.slow) - foutGPU[:, itr] 
+
+                    self.Js = self.Js - cp.outer(err, k)
+                    self.W_out = self.W_out - cp.outer(oerr, k)
+        
+        self.toCPU()
+
+    def trainGPU_mult(self, stim1, stim2, targ1, targ2, fout1, fout2):
+        timesteps = int(self.T/self.dt)
+
+        stim1GPU = cp.asarray(stim1)
+        stim2GPU = cp.asarray(stim2)
+        targ1GPU = cp.asarray(targ1)
+        targ2GPU = cp.asarray(targ2)
+        fout1GPU = cp.asarray(fout1)
+        fout2GPU = cp.asarray(fout2)
+        self.toGPU()
+
+        # initialize correlation matrix
+        P = cp.eye(self.N, self.N) / self.lam
+
+        for i in range(self.nloop):
+            if i % 2 == 0:
+                stimGPU = stim1GPU
+                targGPU = targ1GPU
+                foutGPU = fout1GPU
+            else:
+                stimGPU = stim2GPU
+                targGPU = targ2GPU
+                foutGPU = fout2GPU
 
             for itr in range(timesteps):
 
